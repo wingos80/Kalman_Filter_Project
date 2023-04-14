@@ -152,7 +152,7 @@ class IEKF:
         # Calc Jacobians, Phi(k+1, k), and Gamma(k+1, k)
         F_jacobian  = self.Fx(0, self.x_k1_k, U_k)
         ss_B        = control.matlab.ss(F_jacobian, self.B, np.zeros((self.nm, self.n)), np.zeros((self.nm, self.m)))  # state space model with A and B matrices, to identify phi and psi matrices
-        ss_G        = control.matlab.ss(F_jacobian, self.G, np.zeros((self.nm, self.n)), np.zeros((self.nm, self.n)))  # state space model with A and G matrices, to identify phi and gamma matrices
+        ss_G        = control.matlab.ss(F_jacobian, self.G, np.zeros((self.nm, self.n)), np.zeros((self.nm, self.G.shape[1])))  # state space model with A and G matrices, to identify phi and gamma matrices
         
 
         # Continuous to discrete time transformation of state space matrices
@@ -163,9 +163,34 @@ class IEKF:
         # P(k+1|k) (prediction covariance matrix)
         self.P_k1_k = Phi@self.P_k1_k1@Phi.transpose() + Gamma@self.Q@Gamma.transpose()
         self.eta2   = self.x_k1_k
+        self.F_jacobian = F_jacobian
 
 
-    def run_iteration(self, U_k, Z_k):
+    def check_obs_rank(self, Hx, Fx):
+        """
+        Check the observability of the state
+
+        Parameters
+        ----------
+        Hx : np.array
+            Jacobian of the output equation
+
+        Fx : np.array
+            Jacobian of the system dynamics
+        """
+        rank = np.zeros([self.nm*self.n, self.n])
+        rank[0:self.nm, :] = Hx
+        for i in range(1, self.n):
+            rank[i*self.nm:(i+1)*self.nm, :] = rank[(i-1)*self.nm:i*self.nm, :]@Fx
+
+        #  code to test if i have constructed the obsvervability matrix correctly
+        # rank2 = control.matlab.obsv(Fx, Hx)
+        # test = rank-rank2
+        rankHF = np.linalg.matrix_rank(rank)
+        return rankHF
+
+
+    def run_iteration(self, U_k, Z_k, k):
         """
         Run one iteration of the IEKF
 
@@ -182,12 +207,20 @@ class IEKF:
 
         # Construct the Jacobian H = d/dx(h(x))) with h(x) the observation model transition matrix 
         H_jacobian  = self.Hx(0, self.eta1, U_k)
+        F_jacobian  = self.F_jacobian
         
+        # Check observability of state
+        if (k == 0 and self.itr == 1):
+            rankHF  = self.check_obs_rank(H_jacobian, F_jacobian);
+            if (rankHF < self.n):
+                print('\n\n\n\n**********************WARNING**********************\n\n')
+                print(f'The current state is not observable; rank of Observability Matrix is {rankHF}, should be {self.n}')
+
         # Observation and observation error predictions
         self.z_k1_k      = self.h(0, self.eta1, U_k)                            # prediction of observation (for validation)   
         P_zz        = H_jacobian@self.P_k1_k@H_jacobian.transpose() + self.R    # covariance matrix of observation error (for validation)   
-
-        # Raise exception in case the covariance matrix is too small
+        
+        # Raise exception in case the covariance matrix is too small    
         try:
             self.std_z       = np.sqrt(P_zz.diagonal())          # standard deviation of observation error (for validation)    
         except:
@@ -197,7 +230,7 @@ class IEKF:
         Kalman_Gain             = self.P_k1_k@H_jacobian.transpose()@np.linalg.inv(P_zz)
     
         # New observation
-        temp = np.reshape(Z_k, (3,1))                  # Need to reshape this Z array to a column vector
+        temp = np.reshape(Z_k, (self.nm,1))                  # Need to reshape this Z array to a column vector
         eta2        = self.x_k1_k + Kalman_Gain@(temp - self.z_k1_k - H_jacobian@(self.x_k1_k - self.eta1))
         self.err         = np.linalg.norm(eta2-self.eta1)/np.linalg.norm(self.eta1)  # difference in updated state estimate 
                                                                                      # and previous state estimate

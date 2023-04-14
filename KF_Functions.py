@@ -60,17 +60,18 @@ def rk4(fn, xin, uin, t):
 # u = [Ax, Ay, Az, p, q, r]
 def kf_calc_f(t, X, U):
     """
-    Calculates the system dynamics equation f(X,U,t)
+    Calculates the system dynamics equation f(X,U,t),
+    n (=18) is number of states.
     
     Parameters
     ----------
     t : float
     
     X : numpy.ndarray (n,1)
-        state vector
+        state vector, X = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz, lambdax, lambday, lambdaz, lambdap, lambdaq, lambdar]^T
         
-    U : numpy.ndarray
-        input vector
+    U : numpy.ndarray (m,1)
+        input vector, U = [Ax, Ay, Az, p, q, r]^T
         
     Returns
     -------
@@ -80,7 +81,7 @@ def kf_calc_f(t, X, U):
     
     n       = X.size
     Xdot    = np.zeros([n,1])
-    g = 9.80665             # gravitational acceleration [m/s^2]
+    g = 9.80665                # gravitational acceleration [m/s^2]
 
     # saving the individual state and input names to make the code more readable
     x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
@@ -99,111 +100,284 @@ def kf_calc_f(t, X, U):
     Xdot[6] = p + q*np.sin(phi)*np.tan(theta) + r*np.cos(phi)*np.tan(theta)
     Xdot[7] = q*np.cos(phi) - r*np.sin(phi)
     Xdot[8] = q*np.sin(phi)/np.cos(theta) + r*np.cos(phi)/np.cos(theta)
-    Xdot[9] = 0
-    Xdot[10] = 0
-    Xdot[11] = 0
+    Xdot[9:] = 0
 
     return Xdot
         
 
-def kf_calc_Fx(t, x, u):
+def kf_calc_Fx(t, X, U):
     """
     Calculates the Jacobian of the system dynamics equation,
-    n is number of states.
+    n (=18) is number of states.
     
     Parameters
     ----------
     t : float
+    
+    X : numpy.ndarray (n,1)
+        state vector, X = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz, lambdax, lambday, lambdaz, lambdap, lambdaq, lambdar]^T
         
-    x : numpy.ndarray (n,1)
-        state vector
-
-    u : numpy.ndarray
-        input vector
-
+    U : numpy.ndarray (m,1)
+        input vector, U = [Ax, Ay, Az, p, q, r]^T
+        
     Returns
     -------
     DFx : numpy.ndarray (n,n)
         Jacobian of the system dynamics equation
         
     """
-    n = x.size
+    n = X.size
+    DFx = np.zeros([n, n])
+    g = 9.80665                # gravitational acceleration [m/s^2]
     
+    # saving the individual state and input names to make the code more readable
+    x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
+    Ax, Ay, Az, p, q, r = U[0], U[1], U[2], U[3], U[4], U[5]
+
     # calculate Jacobian matrix of system dynamics
-    DFx = np.zeros([4, 4])
-    
+
+    # F1 derivatives
+    DFx_1 = np.zeros([1,n])
+    DFx_1[0,3] = np.cos(theta)*np.cos(psi)
+    DFx_1[0,4] = np.sin(phi)*np.sin(theta)*np.cos(psi) - np.cos(phi)*np.sin(psi)
+    DFx_1[0,5] = np.cos(phi)*np.sin(theta)*np.cos(psi) + np.sin(phi)*np.sin(psi)
+    DFx_1[0,6] = (v*np.cos(phi) - w*np.sin(phi))*np.sin(theta)*np.cos(psi) - (-v*np.sin(phi) - w*np.cos(phi))*np.sin(psi)
+    DFx_1[0,7] = (-u*np.sin(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.cos(theta))*np.cos(psi)
+    DFx_1[0,8] = -(u*np.cos(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.sin(theta))*np.sin(psi) - (v*np.cos(phi) - w*np.sin(phi))*np.cos(psi)
+    DFx_1[0,9] = 1
+    DFx[0,:] = DFx_1
+
+    # F2 derivatives
+    DFx_2 = np.zeros([1,n])
+    DFx_2[0,3] = np.cos(theta)*np.sin(psi)
+    DFx_2[0,4] = np.sin(phi)*np.sin(theta)*np.sin(psi) + np.cos(phi)*np.cos(psi)
+    DFx_2[0,5] = np.cos(phi)*np.sin(theta)*np.sin(psi) - np.sin(phi)*np.cos(psi)
+    DFx_2[0,6] = (v*np.cos(phi) - w*np.sin(phi))*np.sin(theta)*np.sin(psi) + (-v*np.sin(phi) - w*np.cos(phi))*np.cos(psi)
+    DFx_2[0,7] = (-u*np.sin(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.cos(theta))*np.sin(psi)
+    DFx_2[0,8] = (u*np.cos(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.sin(theta))*np.cos(psi) - (v*np.cos(phi) - w*np.sin(phi))*np.sin(psi)
+    DFx_2[0,10] = 1
+    DFx[1,:] = DFx_2
+
+    # F3 derivatives
+    DFx_3 = np.zeros([1,n])
+    DFx_3[0,3] = -np.sin(theta)
+    DFx_3[0,4] = np.sin(phi)*np.cos(theta)
+    DFx_3[0,5] = np.cos(phi)*np.cos(theta)
+    DFx_3[0,6] = (v*np.cos(phi) - w*np.sin(phi))*np.cos(theta) 
+    DFx_3[0,7] = -u*np.cos(theta) - (v*np.sin(theta) + w*np.cos(theta))*np.sin(theta)
+    DFx_3[0,11] = 1
+    DFx[2,:] = DFx_3
+
+    # F4 derivatives
+    DFx_4 = np.zeros([1,n])
+    DFx_4[0,4] = r
+    DFx_4[0,5] = -q
+    DFx_4[0,7] = -g*np.cos(theta)
+    DFx_4[0,12:] = np.array([1, 0, 0, 0, -w, v], dtype=object)
+    DFx[3,:] = DFx_4
+
+    # F5 derivatives
+    DFx_5 = np.zeros([1,n])
+    DFx_5[0,3] = -r
+    DFx_5[0,5] = p
+    DFx_5[0,6] = g*np.cos(phi)*np.cos(theta)
+    DFx_5[0,12:] = np.array([0, 1, 0, w, 0, -u], dtype=object)
+    DFx[4,:] = DFx_5
+
+    # F6 derivatives
+    DFx_6 = np.zeros([1,n])
+    DFx_6[0,3] = q
+    DFx_6[0,4] = -p
+    DFx_6[0,6] = -g*np.cos(theta)*np.sin(phi)
+    DFx_6[0,7] = -g*np.sin(theta)*np.cos(phi)
+    DFx_6[0,12:] = np.array([0, 0, 1, -v, u, 0], dtype=object)
+    DFx[5,:] = DFx_6
+
+    # F7 derivatives
+    DFx_7 = np.zeros([1,n])
+    DFx_7[0,6] = q*np.cos(phi)*np.tan(theta) - r*np.sin(phi)*np.tan(theta)
+    DFx_7[0,7] = q*np.sin(phi)/(np.cos(theta)**2) + r*np.cos(phi)/(np.cos(theta)**2)
+    DFx_7[0,15:] = np.array([1, np.sin(phi)*np.tan(theta), np.cos(phi)*np.tan(theta)], dtype=object)
+    DFx[6,:] = DFx_7
+
+    # F8 derivatives
+    DFx_8 = np.zeros([1,n])
+    DFx_8[0,6] = -q*np.sin(phi) - r*np.cos(phi)
+    DFx_8[0,16] = np.cos(phi)
+    DFx_8[0,17] = -np.sin(phi)
+    DFx[7,:] = DFx_8
+
+    # F9 derivatives
+    DFx_9 = np.zeros([1,n])
+    DFx_9[0,6] = q*np.cos(phi)/np.cos(theta) - r*np.sin(phi)/np.cos(theta)
+    DFx_9[0,7] = q*np.sin(phi)*np.sin(theta)/(np.cos(theta)**2) + r*np.cos(phi)*np.sin(theta)/(np.cos(theta)**2)
+    DFx_9[0,16] = np.sin(phi)/np.cos(theta)
+    DFx_9[0,17] = np.cos(phi)/np.cos(theta)
+    DFx[8,:] = DFx_9
+
     return DFx
         
 
-def kf_calc_h(t, x, u):
+def kf_calc_h(t, X, U):
     """
     Calculates the system output equations h(x,u,t),
-    nm (=3) is number of outputs.
+    nm (=12) is number of outputs.
     
     Parameters
     ----------
     t : float
+    
+    X : numpy.ndarray (n,1)
+        state vector, X = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz, lambdax, lambday, lambdaz, lambdap, lambdaq, lambdar]^T
         
-    x : numpy.ndarray (n,1)
-        state vector
-
-    u : numpy.ndarray
-        input vector
-
+    U : numpy.ndarray (m,1)
+        input vector, U = [Ax, Ay, Az, p, q, r]^T
+        
     Returns
     -------
-    zpred : numpy.ndarray (nm,1)
+    Zpred : numpy.ndarray (nm,1)
         system output equations
     """
-    
+    n = X.size
+    Zpred = np.zeros((12,1))
+    g = 9.80665                # gravitational acceleration [m/s^2]
+
+    # saving the individual state and input names to make the code more readable
+    x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
+    Ax, Ay, Az, p, q, r = U[0], U[1], U[2], U[3], U[4], U[5]
+
     # output equations go here
-    zpred = np.zeros((3,1))
-    zpred[0] = np.arctan2(x[2],x[0])*(1+x[3])
-    zpred[1] = np.arctan2(x[1],np.sqrt(x[0]**2+x[2]**2))
-    zpred[2] = np.sqrt(x[0]**2+x[1]**2+x[2]**2)
-    return zpred
+    A = u*np.cos(theta) + (v*np.sin(theta) + w*np.cos(phi))*np.sin(theta)  # saving some big terms to make expressions more readable
+    B = (v*np.cos(phi) - w*np.sin(phi))                                    # saving some big terms to make expressions more readable
+
+    Zpred[0] = x
+    Zpred[1] = y
+    Zpred[2] = z
+    Zpred[3] = A*np.cos(psi) - B*np.sin(psi) + Wx
+    Zpred[4] = A*np.sin(psi) + B*np.cos(psi) + Wy
+    Zpred[5] = -u*np.sin(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.cos(theta) + Wz
+    Zpred[6] = phi
+    Zpred[7] = theta
+    Zpred[8] = psi
+    Zpred[9] = np.sqrt(u**2 + v**2 + w**2)
+    Zpred[10] = np.arctan2(w,u)
+    Zpred[11] = np.arctan2(v,np.sqrt(u**2 + w**2))
+
+    return Zpred
         
 
-def kf_calc_Hx(t, x, u):
+def kf_calc_Hx(t, X, U):
     """
     Calculates the Jacobian of the output dynamics equation, 
-    n is number of states, nm (=3) is number of outputs.
+    n (=18) is number of states, nm (=12) is number of outputs.
 
     Parameters
     ----------
     t : float
-
-    x : numpy.ndarray (n,1)
-        state vector
-
-    u : numpy.ndarray
-        input vector
-
+    
+    X : numpy.ndarray (n,1)
+        state vector, X = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz, lambdax, lambday, lambdaz, lambdap, lambdaq, lambdar]^T
+        
+    U : numpy.ndarray (m,1)
+        input vector, U = [Ax, Ay, Az, p, q, r]^T
+        
     Returns
     -------
     Hx : numpy.ndarray (nm,n)   
         Jacobian of the output dynamics equation
 
     """
-    n = x.size
+    n = X.size
+    DHx = np.zeros([12, n])
+    g = 9.80665                # gravitational acceleration [m/s^2]
     
+    # saving the individual state and input names to make the code more readable
+    x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
+    Ax, Ay, Az, p, q, r = U[0], U[1], U[2], U[3], U[4], U[5]
+
     # calculate Jacobian matrix of system dynamics
-    Hx = np.zeros([3, n])
-    # derivatives of h1
-    Hx[0,0] = -x[2]/(x[0]**2 + x[2]**2)*(1 + x[3])
-    Hx[0,2] = x[0]/(x[0]**2 + x[2]**2)*(1 + x[3])
-    Hx[0,3] = np.arctan2(x[2],x[0])
+    
+    # H1 derivatives
+    DHx_1 = np.zeros([1,n])
+    DHx_1[0, 0] = 1
+    DHx[0,:] = DHx_1
 
-    # derivatives of h2
-    Hx[1,0] = -x[1]*x[2]/(np.sqrt(x[0]**2 + x[2]**2)*(x[0]**2 + x[1]**2 + x[2]**2))
-    Hx[1,1] = np.sqrt(x[0]**2 + x[2]**2)/(x[0]**2 + x[1]**2 + x[2]**2)
-    Hx[1,2] = -x[0]*x[1]/(np.sqrt(x[0]**2 + x[2]**2)*(x[0]**2 + x[1]**2 + x[2]**2))
+    # H2 derivatives
+    DHx_2 = np.zeros([1,n])
+    DHx_2[0, 1] = 1
+    DHx[1,:] = DHx_2
 
-    # derivatives of h3
-    Hx[2,0] = x[0]/np.sqrt(x[0]**2 + x[1]**2 + x[2]**2)
-    Hx[2,1] = x[1]/np.sqrt(x[0]**2 + x[1]**2 + x[2]**2)
-    Hx[2,2] = x[2]/np.sqrt(x[0]**2 + x[1]**2 + x[2]**2)
+    # H3 derivatives
+    DHx_3 = np.zeros([1,n])
+    DHx_3[0, 2] = 1
+    DHx[2,:] = DHx_3
 
+    # H4 derivatives
+    DHx_4 = np.zeros([1,n])
+    DHx_4[0,3] = np.cos(theta)*np.cos(psi)
+    DHx_4[0,4] = np.sin(phi)*np.sin(theta)*np.cos(psi) - np.cos(phi)*np.sin(psi)
+    DHx_4[0,5] = np.cos(phi)*np.sin(theta)*np.cos(psi) + np.sin(phi)*np.sin(psi)
+    DHx_4[0,6] = (v*np.cos(phi) - w*np.sin(phi))*np.sin(theta)*np.cos(psi) - (-v*np.sin(phi) - w*np.cos(phi))*np.sin(psi)
+    DHx_4[0,7] = (-u*np.sin(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.cos(theta))*np.cos(psi)
+    DHx_4[0,8] = -(u*np.cos(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.sin(theta))*np.sin(psi) - (v*np.cos(phi) - w*np.sin(phi))*np.cos(psi)
+    DHx_4[0,9] = 1
+    DHx[3,:] = DHx_4
+    
+    # H5 derivatives
+    DHx_5 = np.zeros([1,n])
+    DHx_5[0,3] = np.cos(theta)*np.sin(psi)
+    DHx_5[0,4] = np.sin(phi)*np.sin(theta)*np.sin(psi) + np.cos(phi)*np.cos(psi)
+    DHx_5[0,5] = np.cos(phi)*np.sin(theta)*np.sin(psi) - np.sin(phi)*np.cos(psi)
+    DHx_5[0,6] = (v*np.cos(phi) - w*np.sin(phi))*np.sin(theta)*np.sin(psi) + (-v*np.sin(phi) - w*np.cos(phi))*np.cos(psi)
+    DHx_5[0,7] = (-u*np.sin(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.cos(theta))*np.sin(psi)
+    DHx_5[0,8] = (u*np.cos(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.sin(theta))*np.cos(psi) - (v*np.cos(phi) - w*np.sin(phi))*np.sin(psi)
+    DHx_5[0,10] = 1
+    DHx[4,:] = DHx_5
 
-    return Hx
+    # H6 derivatives
+    DHx_6 = np.zeros([1,n])
+    DHx_6[0,3] = -np.sin(theta)
+    DHx_6[0,4] = np.sin(phi)*np.cos(theta)
+    DHx_6[0,5] = np.cos(phi)*np.cos(theta)
+    DHx_6[0,6] = (v*np.cos(phi) - w*np.sin(phi))*np.cos(theta) 
+    DHx_6[0,7] = -u*np.cos(theta) - (v*np.sin(theta) + w*np.cos(theta))*np.sin(theta)
+    DHx_6[0,11] = 1
+    DHx[5,:] = DHx_6
+
+    # H7 derivatives
+    DHx_7 = np.zeros([1,n])
+    DHx_7[0,6] = 1
+    DHx[6,:] = DHx_7
+
+    # H8 derivatives
+    DHx_8 = np.zeros([1,n])
+    DHx_8[0,7] = 1
+    DHx[7,:] = DHx_8
+
+    # H9 derivatives
+    DHx_9 = np.zeros([1,n])
+    DHx_9[0,8] = 1
+    DHx[8,:] = DHx_9
+
+    # H10 derivatives
+    DHx_10 = np.zeros([1,n])
+    DHx_10[0,3] = u/(np.sqrt(u**2 + v**2 + w**2))
+    DHx_10[0,4] = v/(np.sqrt(u**2 + v**2 + w**2))
+    DHx_10[0,5] = w/(np.sqrt(u**2 + v**2 + w**2))
+    DHx[9,:] = DHx_10
+
+    # H11 derivatives
+    DHx_11 = np.zeros([1,n])
+    DHx_11[0,3] =-w/(u**2 + w**2)
+    DHx_11[0,5] = u/(u**2 + w**2)
+    DHx[10,:] = DHx_11
+
+    # H12 derivatives
+    DHx_12 = np.zeros([1,n])
+    DHx_12[0,3] = -u*v/(np.sqrt(u**2 + w**2)*(u**2 + v**2 + w**2))
+    DHx_12[0,4] = (u**2 + w**2)/(u**2 + v**2 + w**2)
+    DHx_12[0,5] = -w*v/(np.sqrt(u**2 + w**2)*(u**2 + v**2 + w**2))
+    DHx[11,:] = DHx_12
+
+    return DHx
         

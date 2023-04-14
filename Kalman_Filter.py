@@ -24,28 +24,25 @@ sns.set(style = "darkgrid")                  # Set seaborn style
 ## Data I/O managing
 ########################################################################
 
-filename = 'data/F16traindata_CMabV_2023.csv'
+filename = 'data/da3211_2_measurements.csv'
 train_data = genfromtxt(filename, delimiter=',').T
+train_data = train_data[:, 1:]
 
-C_m        = train_data[0]                    # Measured C_m
-Z          = train_data[1:4]                  # Measured alpha, beta, velocity
-U          = train_data[4:]                   # Measured u, v, w
 
-alpha_m    = Z[0]                             # Measured alpha
-beta_m     = Z[1]                             # Measured beta
-V_m        = Z[2]                             # Measured velocity
+Z          = train_data[3:15]                  # First 9 columns are the gps measurements, last 3 are the airdata sensor measurements
+U          = train_data[-6:]                   # These are the IMU measurements
 
-result_file = open(f"data/F16traindata_CMabV_2023_kf.csv", "w")
-result_file.write(f"Cm, alpha_m, beta_m, V_t, alpha_m_kf, beta_m_kf, V_t_kf, alpha_t_kf, C_a_up\n")
+# result_file = open(f"data/F16traindata_CMabV_2023_kf.csv", "w")
+# result_file.write(f"Cm, alpha_m, beta_m, V_t, alpha_m_kf, beta_m_kf, V_t_kf, alpha_t_kf, C_a_up\n")
 
 
 ########################################################################
 ## Set simulation parameters
 ########################################################################
 
-n               = 4                          # state dimension (not used)
-nm              = 3                          # measurement dimension
-m               = 3                          # input dimension (not used)
+n               = 18                          # state dimension (not used)
+nm              = 12                          # measurement dimension
+m               = 6                          # input dimension (not used)
 dt              = 0.01                       # time step (s)
 N               = len(U[0])                  # number of samples
 epsilon         = 10**(-10)                  # IEKF threshold
@@ -56,32 +53,56 @@ figpath         = 'figs/'                    # direction for printed figures
 
 ########################################################################
 ## Set initial values for states and statistics
+# X : numpy.ndarray (n,1)
+#     state vector, X = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz, lambdax, lambday, lambdaz, lambdap, lambdaq, lambdar]^T
+    
+# U : numpy.ndarray (m,1)
+#     input vector, U = [Ax, Ay, Az, p, q, r]^T
+        
 ########################################################################
+E_x_0       = np.zeros([18,1])                                              # initial estimate of optimal value of x_k1_k1
+E_x_0[3:9]  = Z[3:9, 0].reshape(6,1)                                        # initial estimate of velocity and flight angles
+E_x_0[9:12] = np.array([[2], [-8], [1]])                                    # initial estimate of Wind velocities
+E_x_0[12:]  = np.array([[0.02], [0.02], [0.02], [0.003], [0.003], [0.003]]) # initial estimate of lambda
 
-E_x_0       = np.array([[150],[0],[0],[-0.6]])     # initial estimate of optimal value of x_k1_k1
+B           = np.zeros([18,6])               # input matrix, TODO: check if this is correct
 
-B           = np.array([[1, 0, 0],
-                        [0, 1, 0],
-                        [0, 0, 1],
-                        [0, 0, 0]])               # input matrix
 # Initial estimate for covariance matrix
-std_x_0   = 1                                     # initial standard deviation of state prediction error
-P_stds    = [std_x_0, std_x_0, std_x_0, 1]
+std_x_0 = 1.1                                    # initial standard deviation of state prediction error
+std_x_1 = 1*10**(-3)                            # initial standard deviation of state prediction error
+std_x_2 = 1*10**(+1)                            # initial standard deviation of state prediction error
+P_stds  = [std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2, std_x_0**2]
 
 # System noises, all noise are white (unbiased and uncorrelated in time)
-std_w_u = 1*10**(-3)                              # standard deviation of u noise
-std_w_v = 1*10**(-3)                              # standard deviation of v noise
-std_w_w = 1*10**(-3)                              # standard deviation of w noise
-std_w_C = 0                                       # standard deviation of Caup noise
-Q_stds  = [std_w_u, std_w_v, std_w_w, std_w_C]
+std_b_x = 0.02                                  # standard deviation of accelerometer x measurement noise
+std_b_y = 0.02                                  # standard deviation of accelerometer y measurement noise
+std_b_z = 0.02                                  # standard deviation of accelerometer z measurement noise
+std_b_p = 0.003                                 # standard deviation of rate gyro p measurement noise 
+std_b_q = 0.003                                 # standard deviation of rate gyro q measurement noise  
+std_b_r = 0.003                                 # standard deviation of rate gyro r measurement noise  
+Q_stds  = [std_b_x**2, std_b_y**2, std_b_z**2, std_b_p**2, std_b_q**2, std_b_r**2]
 
-G       = np.eye(4)                           # system noise matrix
+G       = np.zeros([18, 6])                      # system noise matrix
+G[3:6, 0:3] = np.eye(3)                                                                   # accelerometer noise
+G[3:6, 3:]  = np.array([[0, -1, 1], [1, 0, -1], [-1, 1, 0]])                              # rate gyro noise
+G[6:9, 3:]  = np.array([[1, 1, 1], [0, 1, -1], [0, 1, 1]])                                # rate gyro noise
 
 # Measurement noise statistics, all noise are white (unbiased and uncorrelated in time)
-std_nu_a = 0.035             # standard deviation of alpha noise
-std_nu_b = 0.010             # standard deviation of beta noise
-std_nu_V = 0.110             # standard deviation of velocity noise
-R_stds   = [std_nu_a, std_nu_b, std_nu_V]
+std_gps_x = 2.5                                 # standard deviation of GPS x position measurement noise
+std_gps_y = std_gps_x                           # standard deviation of GPS y position measurement noise
+std_gps_z = std_gps_x                           # standard deviation of GPS z position measurement noise
+std_gps_u = 0.02                                # standard deviation of GPS u velocity measurement noise
+std_gps_v = std_gps_u                           # standard deviation of GPS v velocity measurement noise
+std_gps_w = std_gps_u                           # standard deviation of GPS w velocity measurement noise
+std_gps_phi = 0.05                              # standard deviation of GPS phi measurement noise
+std_gps_theta = std_gps_phi                     # standard deviation of GPS theta measurement noise
+std_gps_psi = std_gps_phi                       # standard deviation of GPS psi measurement noise
+
+std_ads_v = 0.1                                 # standard deviation of air data sensors true airspeed measurement noise
+std_ads_alpha = 0.1                             # standard deviation of air data sensors alpha measurement noise
+std_ads_beta = 0.1                              # standard deviation of air data sensors beta measurement noise
+
+R_stds   = [std_gps_x**2, std_gps_y**2, std_gps_z**2, std_gps_u**2, std_gps_v**2, std_gps_w**2, std_gps_phi**2, std_gps_theta**2, std_gps_psi**2, std_ads_v**2, std_ads_alpha**2, std_ads_beta**2]
 
 ########################################################################
 ## Run the Kalman filter
@@ -103,7 +124,7 @@ for k in range(N):
     if k % 100 == 0:
         tonc = time.time()
         print(f'Sample {k} of {N} ({k/N*100:.3f} %), time elapsed: {tonc-tic:.2f} s')
-        print(f'    Current estimate of C_a_up: {kalman_filter.x_k1_k1[-1,0]:.4f}\n')
+        print(f'    Current estimate of system states:\n        {kalman_filter.x_k1_k1}\n')
     
     # Picking out the k-th entry in the input and measurement vectors
     U_k = U[:,k]  
@@ -114,7 +135,7 @@ for k in range(N):
     
     # Running iterations of the IEKF
     while kalman_filter.not_converged():
-        kalman_filter.run_iteration(U_k, Z_k)
+        kalman_filter.run_iteration(U_k, Z_k, k)
 
     # Once converged, update the state and state covariances estimates
     kalman_filter.update(k)
@@ -124,119 +145,49 @@ toc = time.time()
 
 print(f'Elapsed time: {toc-tic:.5f} s')
 
-# Saving the kalman filtered measurements (predics)
-alpha_m_kf = kalman_filter.ZZ_pred[0]         # Predicted alpha from KF
-beta_m_kf  = kalman_filter.ZZ_pred[1]         # Predicted beta from KF
-V_m_kf     = kalman_filter.ZZ_pred[2]         # Predicted velocity from KF
-
-########################################################################
-## Reconstructing true alpha
-########################################################################
-
-C_a_up     = kalman_filter.XX_k1_k1[3,-1]     # Taking the last estimate of C_a_up
-alpha_t    = alpha_m/(1+C_a_up)               # Reconstructing true alpha, noise is 
-                                              #  assumed unbiased thus this estimation of 
-                                              #  alpha is unbiased as well
-alpha_t_kf = alpha_m_kf/(1+C_a_up)            # Reconstructing true alpha from KF filtered alpha
-
-# experimenting with using an exponentially weighted moving average to filter alpha_m
-rho = 0.95 # Rho value for smoothing
-
-s_prev = 0 # Initial value ewma value
+# Saving the kalman filtered measurements (predicts)
+Winds = kalman_filter.XX_k1_k1[9:12]         # Predicted alpha from KF
+Winds_covariances = kalman_filter.PP_k1_k1[9:12] # Predicted alpha covariance from KF
+new_lambdas = kalman_filter.XX_k1_k1[12:] # Predicted lambda from KF
+lambda_covariances = kalman_filter.PP_k1_k1[12:] # Predicted lambda covariance from KF
+kf_u = kalman_filter.ZZ_pred[3]          # Predicted u from KF
+unkf_u = Z[3]
 
 
-ewma, ewma_bias_corr = np.empty(0), np.empty(0)  # Empty arrays to hold the smoothed data
-
-for i in range(N):
-    y = alpha_m[i]
-    # Variables to store smoothed data point
-    s_cur = 0
-    s_cur_bc = 0
-
-    s_cur = rho* s_prev + (1-rho)*y
-    s_cur_bc = s_cur/(1-(rho**(i+1)))
-
-    # Append new smoothed value to array
-    ewma = np.append(ewma,s_cur)
-    ewma_bias_corr = np.append(ewma_bias_corr,s_cur_bc)
-
-    s_prev = s_cur
-
-# Note to self, EWMA is much easier to implement, does not require any knowledge of the system, has a lot less places where bugs can occur, and also 
-# computes much faster than the IEKF (perhaps for other variants of the KF as well). However, if we inspect the output of EWMA, we can see that in some 
-# occasions the EWMA fails to predict the correct signs of the signal, which might be extremely costly in some applications. Moreover, there is a time 
-# delay associated with the signal computed with EWMA, and EWMA can only smooth out signals, it won't be able to reconstruct some unmeasurable states 
-# such as the true alpha or upwash coefficient: but KF's can. Moreover, KF's can be used to estimate the variance of the states, which is not possible 
-# with EWMA (but there is a way to build confidence intervals for EWMA, in page 8 of: http://www.wiley.com.tudelft.idm.oclc.org/legacy/wileychi/marketmodels/chapter5.pdf). 
-
-# In conclusion, KF's are more powerful than EWMA, but EWMA is much easier to implement and faster.
-
-C_a_up     = kalman_filter.XX_k1_k1[3,:]      # Upwash coefficient prediction over time
-
-# writing all results to a csv file
-for k in range(N):
-    C_m_k = C_m[k]
-    a_m_k = alpha_m[k]
-    b_m_k = beta_m[k]
-    V_m_k = V_m[k]
-    a_m_kf_k = alpha_m_kf[k]
-    b_m_kf_k = beta_m_kf[k]
-    V_m_kf_k = V_m_kf[k]
-    a_t_kf_k = alpha_t_kf[k]
-    C_a_up_k = C_a_up[k]
-    result_file.write(f"{C_m[k]}, {a_m_k}, {b_m_k}, {V_m_k}, {a_m_kf_k}, {b_m_kf_k}, {V_m_kf_k}, {a_t_kf_k}, {C_a_up_k}\n")
-
-result_file.close()
+x      = dt*np.arange(0, N, 1)
+ys     = {'raw u\'s': [unkf_u, 0.9], 
+          'kf u\'s': [kf_u, 0.9]}
+make_plots(x, [ys], 'raw and kalman-filtered u velocities', 'Time [s]', ['u\' [m/s]'], printfigs)
 
 
-if __name__ == "__main__":
-    ########################################################################
-    ## Plotting results
-    ########################################################################
+ys1 = {'Wind x over time': [Winds[0], 0.9],
+      'Wind y over time': [Winds[1], 0.9],
+      'Wind z over time': [Winds[2], 0.9]}
+ys2 = {'Wind x variance over time': [Winds_covariances[0], 0.9],
+      'Wind y variance over time': [Winds_covariances[1], 0.9],
+      'Wind z variance over time': [Winds_covariances[2], 0.9]}
 
+make_plots(x, [ys1, ys2], 'Wind over time', 'Time [s]', ['Wind [m/s]', 'Wind variance [m2/s2]'], printfigs, log=1)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
+ys1 = {'lambda Ax': [new_lambdas[0], 0.9],
+        'lambda Ay': [new_lambdas[1], 0.9],
+        'lambda Az': [new_lambdas[2], 0.9]}
+ys2 = {'lambda Ax variance': [lambda_covariances[0], 0.9],
+        'lambda Ay variance': [lambda_covariances[1], 0.9],
+        'lambda Az variance': [lambda_covariances[2], 0.9]}
+make_plots(x, [ys1, ys2], 'acceleration biases variance over time', 'Time [s]', ['Bias [m/s2]', 'Variance [m2/s4]'], printfigs, log=1)
 
-    ax.scatter(alpha_m, beta_m, V_m, c='r', marker='o', label='Measured', s=1)
-    plt.title('Measured alpha, beta, V', fontsize = 18)
+ys1 = {'lambda p': [new_lambdas[3], 0.9],
+        'lambda q': [new_lambdas[4], 0.9],
+        'lambda r': [new_lambdas[5], 0.9]}
+ys2 = {'lambda p variance': [lambda_covariances[3], 0.9],
+        'lambda q variance': [lambda_covariances[4], 0.9],
+        'lambda r variance': [lambda_covariances[5], 0.9]}
+make_plots(x, [ys1, ys2], 'angle bias variances over time', 'Time [s]', ['Bias [rad/s]', 'Variance [rad2/s2]'], printfigs, log=1)
+plt.show()
 
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
+# # writing all results to a csv file
+# for k in range(N):
+#     result_file.write(f"{C_m[k]}, {a_m_k}, {b_m_k}, {V_m_k}, {a_m_kf_k}, {b_m_kf_k}, {V_m_kf_k}, {a_t_kf_k}, {C_a_up_k}\n")
 
-    ax.scatter(alpha_t_kf, beta_m_kf, V_m_kf, c='b', marker='o', label='KF', s=1)
-    plt.title('Predicted true alpha, beta, V', fontsize = 18)
-
-    plt.show()
-
-
-    # Plot the upwash coefficient estimate generated by the kalman filter
-    x      = dt*np.arange(0, N, 1)
-    ys  = {'Estimated C_a_up' : [C_a_up, 1.0]}
-
-    plotter(x, ys, 'C_a_up estimate evolution', 'Time [s]', 'C_a_up [-]', printfigs)
-
-    # Plotting the true alpha and the reconstructed alpha
-    ys  = { 'True alpha'              : [alpha_t    , 0.4],
-            'Measured alpha'          : [alpha_m    , 0.4],
-            'True alpha from KF'      : [alpha_t_kf , 1.0],
-            'Predicted alpha from KF' : [alpha_m_kf , 1.0],
-            'ewma alpha'              : [ewma       , 1.0]}
-
-    plotter(x, ys, 'Reconstructed alpha', 'Time [s]', 'alpha [-]', printfigs)
-
-    # Plot variance of all states
-    ys  = { 'Estimated variance of u'      : [kalman_filter.PP_k1_k1[0,:], 1.0],
-            'Estimated variance of v'      : [kalman_filter.PP_k1_k1[1,:], 1.0],
-            'Estimated variance of w'      : [kalman_filter.PP_k1_k1[2,:], 1.0],
-            'Estimated variance of C_a_up' : [kalman_filter.PP_k1_k1[3,:], 1.0]}
-
-    plotter(x, ys, 'Variance of states', 'Time [s]', 'Variance [-]', printfigs)
-
-    # Plot number of IEKF iterations at each IEKF step
-
-    ys  = {'Number of IEKF iterations' : [kalman_filter.IEKFitcount, 1.0]}
-
-    plotter(x, ys, 'Number of IEKF iterations', 'Time [s]', 'Number of iterations [-]', printfigs)
-
-    plt.show()
+# result_file.close()
