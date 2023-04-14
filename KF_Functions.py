@@ -86,20 +86,26 @@ def kf_calc_f(t, X, U):
     # saving the individual state and input names to make the code more readable
     x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
     Ax, Ay, Az, p, q, r = U[0], U[1], U[2], U[3], U[4], U[5]
+    #####################################################   
+    ## System dynamics go here
+    #####################################################
 
-    # system dynamics go here
-    A = u*np.cos(theta) + (v*np.sin(theta) + w*np.cos(phi))*np.sin(theta)  # saving some big terms to make expressions more readable
-    B = (v*np.cos(phi) - w*np.sin(phi))                                    # saving some big terms to make expressions more readable
+    # saving the trig function values to make computations faster
+    sin_phi, cos_phi, sin_theta, cos_theta, sin_psi, cos_psi = np.sin(phi), np.cos(phi), np.sin(theta), np.cos(theta), np.sin(psi), np.cos(psi)
+    tan_theta = np.tan(theta)
 
-    Xdot[0] = A*np.cos(psi) - B*np.sin(psi) + Wx
-    Xdot[1] = A*np.sin(psi) + B*np.cos(psi) + Wy
-    Xdot[2] = -u*np.sin(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.cos(theta) + Wz
-    Xdot[3] = Ax - g*np.sin(theta) + r*v - q*w
-    Xdot[4] = Ay + g*np.cos(theta)*np.sin(phi) + p*w - r*u
-    Xdot[5] = Az + g*np.cos(theta)*np.cos(phi) + q*u - p*v
-    Xdot[6] = p + q*np.sin(phi)*np.tan(theta) + r*np.cos(phi)*np.tan(theta)
-    Xdot[7] = q*np.cos(phi) - r*np.sin(phi)
-    Xdot[8] = q*np.sin(phi)/np.cos(theta) + r*np.cos(phi)/np.cos(theta)
+    A = u*cos_theta + (v*sin_theta + w*cos_phi)*sin_theta  # saving some big terms to make expressions more readable
+    B = (v*cos_phi - w*sin_phi)                                    # saving some big terms to make expressions more readable
+
+    Xdot[0] = A*cos_psi - B*sin_psi + Wx
+    Xdot[1] = A*sin_psi + B*cos_psi + Wy
+    Xdot[2] = -u*sin_theta + (v*sin_phi + w*cos_phi)*cos_theta + Wz
+    Xdot[3] = Ax - g*sin_theta + r*v - q*w
+    Xdot[4] = Ay + g*cos_theta*sin_phi + p*w - r*u
+    Xdot[5] = Az + g*cos_theta*cos_phi + q*u - p*v
+    Xdot[6] = p + q*sin_phi*tan_theta + r*cos_phi*tan_theta
+    Xdot[7] = q*cos_phi - r*sin_phi
+    Xdot[8] = q*sin_phi/cos_theta + r*cos_phi/cos_theta
     Xdot[9:] = 0
 
     return Xdot
@@ -134,37 +140,43 @@ def kf_calc_Fx(t, X, U):
     x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
     Ax, Ay, Az, p, q, r = U[0], U[1], U[2], U[3], U[4], U[5]
 
-    # calculate Jacobian matrix of system dynamics
+    #####################################################
+    ## Calculate Jacobian matrix of system dynamics
+    #####################################################
+
+    # saving the trig function values to make computations faster
+    sin_phi, cos_phi, sin_theta, cos_theta, sin_psi, cos_psi = np.sin(phi), np.cos(phi), np.sin(theta), np.cos(theta), np.sin(psi), np.cos(psi)
+    tan_theta = np.tan(theta)
 
     # F1 derivatives
     DFx_1 = np.zeros([1,n])
-    DFx_1[0,3] = np.cos(theta)*np.cos(psi)
-    DFx_1[0,4] = np.sin(phi)*np.sin(theta)*np.cos(psi) - np.cos(phi)*np.sin(psi)
-    DFx_1[0,5] = np.cos(phi)*np.sin(theta)*np.cos(psi) + np.sin(phi)*np.sin(psi)
-    DFx_1[0,6] = (v*np.cos(phi) - w*np.sin(phi))*np.sin(theta)*np.cos(psi) - (-v*np.sin(phi) - w*np.cos(phi))*np.sin(psi)
-    DFx_1[0,7] = (-u*np.sin(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.cos(theta))*np.cos(psi)
-    DFx_1[0,8] = -(u*np.cos(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.sin(theta))*np.sin(psi) - (v*np.cos(phi) - w*np.sin(phi))*np.cos(psi)
+    DFx_1[0,3] = cos_theta*cos_psi
+    DFx_1[0,4] = sin_phi*sin_theta*cos_psi - cos_phi*sin_psi
+    DFx_1[0,5] = cos_phi*sin_theta*cos_psi + sin_phi*sin_psi
+    DFx_1[0,6] = (v*cos_phi - w*sin_phi)*sin_theta*cos_psi - (-v*sin_phi - w*cos_phi)*sin_psi
+    DFx_1[0,7] = (-u*sin_theta + (v*sin_phi + w*cos_phi)*cos_theta)*cos_psi
+    DFx_1[0,8] = -(u*cos_theta + (v*sin_phi + w*cos_phi)*sin_theta)*sin_psi - (v*cos_phi - w*sin_phi)*cos_psi
     DFx_1[0,9] = 1
     DFx[0,:] = DFx_1
 
     # F2 derivatives
     DFx_2 = np.zeros([1,n])
-    DFx_2[0,3] = np.cos(theta)*np.sin(psi)
-    DFx_2[0,4] = np.sin(phi)*np.sin(theta)*np.sin(psi) + np.cos(phi)*np.cos(psi)
-    DFx_2[0,5] = np.cos(phi)*np.sin(theta)*np.sin(psi) - np.sin(phi)*np.cos(psi)
-    DFx_2[0,6] = (v*np.cos(phi) - w*np.sin(phi))*np.sin(theta)*np.sin(psi) + (-v*np.sin(phi) - w*np.cos(phi))*np.cos(psi)
-    DFx_2[0,7] = (-u*np.sin(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.cos(theta))*np.sin(psi)
-    DFx_2[0,8] = (u*np.cos(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.sin(theta))*np.cos(psi) - (v*np.cos(phi) - w*np.sin(phi))*np.sin(psi)
+    DFx_2[0,3] = cos_theta*sin_psi
+    DFx_2[0,4] = sin_phi*sin_theta*sin_psi + cos_phi*cos_psi
+    DFx_2[0,5] = cos_phi*sin_theta*sin_psi - sin_phi*cos_psi
+    DFx_2[0,6] = (v*cos_phi - w*sin_phi)*sin_theta*sin_psi + (-v*sin_phi - w*cos_phi)*cos_psi
+    DFx_2[0,7] = (-u*sin_theta + (v*sin_phi + w*cos_phi)*cos_theta)*sin_psi
+    DFx_2[0,8] = (u*cos_theta + (v*sin_phi + w*cos_phi)*sin_theta)*cos_psi - (v*cos_phi - w*sin_phi)*sin_psi
     DFx_2[0,10] = 1
     DFx[1,:] = DFx_2
 
     # F3 derivatives
     DFx_3 = np.zeros([1,n])
-    DFx_3[0,3] = -np.sin(theta)
-    DFx_3[0,4] = np.sin(phi)*np.cos(theta)
-    DFx_3[0,5] = np.cos(phi)*np.cos(theta)
-    DFx_3[0,6] = (v*np.cos(phi) - w*np.sin(phi))*np.cos(theta) 
-    DFx_3[0,7] = -u*np.cos(theta) - (v*np.sin(theta) + w*np.cos(theta))*np.sin(theta)
+    DFx_3[0,3] = -sin_theta
+    DFx_3[0,4] = sin_phi*cos_theta
+    DFx_3[0,5] = cos_phi*cos_theta
+    DFx_3[0,6] = (v*cos_phi - w*sin_phi)*cos_theta 
+    DFx_3[0,7] = -u*cos_theta - (v*sin_theta + w*cos_theta)*sin_theta
     DFx_3[0,11] = 1
     DFx[2,:] = DFx_3
 
@@ -172,7 +184,7 @@ def kf_calc_Fx(t, X, U):
     DFx_4 = np.zeros([1,n])
     DFx_4[0,4] = r
     DFx_4[0,5] = -q
-    DFx_4[0,7] = -g*np.cos(theta)
+    DFx_4[0,7] = -g*cos_theta
     DFx_4[0,12:] = np.array([1, 0, 0, 0, -w, v], dtype=object)
     DFx[3,:] = DFx_4
 
@@ -180,7 +192,7 @@ def kf_calc_Fx(t, X, U):
     DFx_5 = np.zeros([1,n])
     DFx_5[0,3] = -r
     DFx_5[0,5] = p
-    DFx_5[0,6] = g*np.cos(phi)*np.cos(theta)
+    DFx_5[0,6] = g*cos_phi*cos_theta
     DFx_5[0,12:] = np.array([0, 1, 0, w, 0, -u], dtype=object)
     DFx[4,:] = DFx_5
 
@@ -188,31 +200,31 @@ def kf_calc_Fx(t, X, U):
     DFx_6 = np.zeros([1,n])
     DFx_6[0,3] = q
     DFx_6[0,4] = -p
-    DFx_6[0,6] = -g*np.cos(theta)*np.sin(phi)
-    DFx_6[0,7] = -g*np.sin(theta)*np.cos(phi)
+    DFx_6[0,6] = -g*cos_theta*sin_phi
+    DFx_6[0,7] = -g*sin_theta*cos_phi
     DFx_6[0,12:] = np.array([0, 0, 1, -v, u, 0], dtype=object)
     DFx[5,:] = DFx_6
 
     # F7 derivatives
     DFx_7 = np.zeros([1,n])
-    DFx_7[0,6] = q*np.cos(phi)*np.tan(theta) - r*np.sin(phi)*np.tan(theta)
-    DFx_7[0,7] = q*np.sin(phi)/(np.cos(theta)**2) + r*np.cos(phi)/(np.cos(theta)**2)
-    DFx_7[0,15:] = np.array([1, np.sin(phi)*np.tan(theta), np.cos(phi)*np.tan(theta)], dtype=object)
+    DFx_7[0,6] = q*cos_phi*tan_theta - r*sin_phi*tan_theta
+    DFx_7[0,7] = q*sin_phi/(cos_theta**2) + r*cos_phi/(cos_theta**2)
+    DFx_7[0,15:] = np.array([1, sin_phi*tan_theta, cos_phi*tan_theta], dtype=object)
     DFx[6,:] = DFx_7
 
     # F8 derivatives
     DFx_8 = np.zeros([1,n])
-    DFx_8[0,6] = -q*np.sin(phi) - r*np.cos(phi)
-    DFx_8[0,16] = np.cos(phi)
-    DFx_8[0,17] = -np.sin(phi)
+    DFx_8[0,6] = -q*sin_phi - r*cos_phi
+    DFx_8[0,16] = cos_phi
+    DFx_8[0,17] = -sin_phi
     DFx[7,:] = DFx_8
 
     # F9 derivatives
     DFx_9 = np.zeros([1,n])
-    DFx_9[0,6] = q*np.cos(phi)/np.cos(theta) - r*np.sin(phi)/np.cos(theta)
-    DFx_9[0,7] = q*np.sin(phi)*np.sin(theta)/(np.cos(theta)**2) + r*np.cos(phi)*np.sin(theta)/(np.cos(theta)**2)
-    DFx_9[0,16] = np.sin(phi)/np.cos(theta)
-    DFx_9[0,17] = np.cos(phi)/np.cos(theta)
+    DFx_9[0,6] = q*cos_phi/cos_theta - r*sin_phi/cos_theta
+    DFx_9[0,7] = q*sin_phi*sin_theta/(cos_theta**2) + r*cos_phi*sin_theta/(cos_theta**2)
+    DFx_9[0,16] = sin_phi/cos_theta
+    DFx_9[0,17] = cos_phi/cos_theta
     DFx[8,:] = DFx_9
 
     return DFx
@@ -246,16 +258,23 @@ def kf_calc_h(t, X, U):
     x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
     Ax, Ay, Az, p, q, r = U[0], U[1], U[2], U[3], U[4], U[5]
 
-    # output equations go here
-    A = u*np.cos(theta) + (v*np.sin(theta) + w*np.cos(phi))*np.sin(theta)  # saving some big terms to make expressions more readable
-    B = (v*np.cos(phi) - w*np.sin(phi))                                    # saving some big terms to make expressions more readable
+    #####################################################   
+    ## Output equations go here
+    #####################################################
+    
+    # saving the trig function values to make computations faster
+    sin_phi, cos_phi, sin_theta, cos_theta, sin_psi, cos_psi = np.sin(phi), np.cos(phi), np.sin(theta), np.cos(theta), np.sin(psi), np.cos(psi)
+    tan_theta = np.tan(theta)
+
+    A = u*cos_theta + (v*sin_theta + w*cos_phi)*sin_theta  # saving some big terms to make expressions more readable
+    B = (v*cos_phi - w*sin_phi)                                    # saving some big terms to make expressions more readable
 
     Zpred[0] = x
     Zpred[1] = y
     Zpred[2] = z
-    Zpred[3] = A*np.cos(psi) - B*np.sin(psi) + Wx
-    Zpred[4] = A*np.sin(psi) + B*np.cos(psi) + Wy
-    Zpred[5] = -u*np.sin(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.cos(theta) + Wz
+    Zpred[3] = A*cos_psi - B*sin_psi + Wx
+    Zpred[4] = A*sin_psi + B*cos_psi + Wy
+    Zpred[5] = -u*sin_theta + (v*sin_phi + w*cos_phi)*cos_theta + Wz
     Zpred[6] = phi
     Zpred[7] = theta
     Zpred[8] = psi
@@ -295,8 +314,15 @@ def kf_calc_Hx(t, X, U):
     x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
     Ax, Ay, Az, p, q, r = U[0], U[1], U[2], U[3], U[4], U[5]
 
-    # calculate Jacobian matrix of system dynamics
-    
+    #####################################################
+    ## Calculate Jacobian matrix of output equations
+    #####################################################
+
+    # saving the trig function values to make computations faster
+    sin_phi, cos_phi, sin_theta, cos_theta, sin_psi, cos_psi = np.sin(phi), np.cos(phi), np.sin(theta), np.cos(theta), np.sin(psi), np.cos(psi)
+    tan_theta = np.tan(theta)
+
+
     # H1 derivatives
     DHx_1 = np.zeros([1,n])
     DHx_1[0, 0] = 1
@@ -314,33 +340,33 @@ def kf_calc_Hx(t, X, U):
 
     # H4 derivatives
     DHx_4 = np.zeros([1,n])
-    DHx_4[0,3] = np.cos(theta)*np.cos(psi)
-    DHx_4[0,4] = np.sin(phi)*np.sin(theta)*np.cos(psi) - np.cos(phi)*np.sin(psi)
-    DHx_4[0,5] = np.cos(phi)*np.sin(theta)*np.cos(psi) + np.sin(phi)*np.sin(psi)
-    DHx_4[0,6] = (v*np.cos(phi) - w*np.sin(phi))*np.sin(theta)*np.cos(psi) - (-v*np.sin(phi) - w*np.cos(phi))*np.sin(psi)
-    DHx_4[0,7] = (-u*np.sin(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.cos(theta))*np.cos(psi)
-    DHx_4[0,8] = -(u*np.cos(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.sin(theta))*np.sin(psi) - (v*np.cos(phi) - w*np.sin(phi))*np.cos(psi)
+    DHx_4[0,3] = cos_theta*cos_psi
+    DHx_4[0,4] = sin_phi*sin_theta*cos_psi - cos_phi*sin_psi
+    DHx_4[0,5] = cos_phi*sin_theta*cos_psi + sin_phi*sin_psi
+    DHx_4[0,6] = (v*cos_phi - w*sin_phi)*sin_theta*cos_psi - (-v*sin_phi - w*cos_phi)*sin_psi
+    DHx_4[0,7] = (-u*sin_theta + (v*sin_phi + w*cos_phi)*cos_theta)*cos_psi
+    DHx_4[0,8] = -(u*cos_theta + (v*sin_phi + w*cos_phi)*sin_theta)*sin_psi - (v*cos_phi - w*sin_phi)*cos_psi
     DHx_4[0,9] = 1
     DHx[3,:] = DHx_4
     
     # H5 derivatives
     DHx_5 = np.zeros([1,n])
-    DHx_5[0,3] = np.cos(theta)*np.sin(psi)
-    DHx_5[0,4] = np.sin(phi)*np.sin(theta)*np.sin(psi) + np.cos(phi)*np.cos(psi)
-    DHx_5[0,5] = np.cos(phi)*np.sin(theta)*np.sin(psi) - np.sin(phi)*np.cos(psi)
-    DHx_5[0,6] = (v*np.cos(phi) - w*np.sin(phi))*np.sin(theta)*np.sin(psi) + (-v*np.sin(phi) - w*np.cos(phi))*np.cos(psi)
-    DHx_5[0,7] = (-u*np.sin(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.cos(theta))*np.sin(psi)
-    DHx_5[0,8] = (u*np.cos(theta) + (v*np.sin(phi) + w*np.cos(phi))*np.sin(theta))*np.cos(psi) - (v*np.cos(phi) - w*np.sin(phi))*np.sin(psi)
+    DHx_5[0,3] = cos_theta*sin_psi
+    DHx_5[0,4] = sin_phi*sin_theta*sin_psi + cos_phi*cos_psi
+    DHx_5[0,5] = cos_phi*sin_theta*sin_psi - sin_phi*cos_psi
+    DHx_5[0,6] = (v*cos_phi - w*sin_phi)*sin_theta*sin_psi + (-v*sin_phi - w*cos_phi)*cos_psi
+    DHx_5[0,7] = (-u*sin_theta + (v*sin_phi + w*cos_phi)*cos_theta)*sin_psi
+    DHx_5[0,8] = (u*cos_theta + (v*sin_phi + w*cos_phi)*sin_theta)*cos_psi - (v*cos_phi - w*sin_phi)*sin_psi
     DHx_5[0,10] = 1
     DHx[4,:] = DHx_5
 
     # H6 derivatives
     DHx_6 = np.zeros([1,n])
-    DHx_6[0,3] = -np.sin(theta)
-    DHx_6[0,4] = np.sin(phi)*np.cos(theta)
-    DHx_6[0,5] = np.cos(phi)*np.cos(theta)
-    DHx_6[0,6] = (v*np.cos(phi) - w*np.sin(phi))*np.cos(theta) 
-    DHx_6[0,7] = -u*np.cos(theta) - (v*np.sin(theta) + w*np.cos(theta))*np.sin(theta)
+    DHx_6[0,3] = -sin_theta
+    DHx_6[0,4] = sin_phi*cos_theta
+    DHx_6[0,5] = cos_phi*cos_theta
+    DHx_6[0,6] = (v*cos_phi - w*sin_phi)*cos_theta 
+    DHx_6[0,7] = -u*cos_theta - (v*sin_theta + w*cos_theta)*sin_theta
     DHx_6[0,11] = 1
     DHx[5,:] = DHx_6
 

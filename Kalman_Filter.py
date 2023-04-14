@@ -35,7 +35,6 @@ U          = train_data[-6:]                   # These are the IMU measurements
 # result_file = open(f"data/F16traindata_CMabV_2023_kf.csv", "w")
 # result_file.write(f"Cm, alpha_m, beta_m, V_t, alpha_m_kf, beta_m_kf, V_t_kf, alpha_t_kf, C_a_up\n")
 
-
 ########################################################################
 ## Set simulation parameters
 ########################################################################
@@ -53,12 +52,11 @@ figpath         = 'figs/'                    # direction for printed figures
 
 ########################################################################
 ## Set initial values for states and statistics
-# X : numpy.ndarray (n,1)
-#     state vector, X = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz, lambdax, lambday, lambdaz, lambdap, lambdaq, lambdar]^T
-    
-# U : numpy.ndarray (m,1)
-#     input vector, U = [Ax, Ay, Az, p, q, r]^T
-        
+## X : numpy.ndarray (n,1)
+##     state vector, X = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz, lambdax, lambday, lambdaz, lambdap, lambdaq, lambdar]^T
+## 
+## U : numpy.ndarray (m,1)
+##     input vector, U = [Ax, Ay, Az, p, q, r]^T
 ########################################################################
 E_x_0       = np.zeros([18,1])                                              # initial estimate of optimal value of x_k1_k1
 E_x_0[3:9]  = Z[3:9, 0].reshape(6,1)                                        # initial estimate of velocity and flight angles
@@ -124,7 +122,7 @@ for k in range(N):
     if k % 100 == 0:
         tonc = time.time()
         print(f'Sample {k} of {N} ({k/N*100:.3f} %), time elapsed: {tonc-tic:.2f} s')
-        print(f'    Current estimate of system states:\n        {kalman_filter.x_k1_k1}\n')
+        print(f'    Current estimate of system states:\n{kalman_filter.x_k1_k1}\n')
     
     # Picking out the k-th entry in the input and measurement vectors
     U_k = U[:,k]  
@@ -145,6 +143,10 @@ toc = time.time()
 
 print(f'Elapsed time: {toc-tic:.5f} s')
 
+########################################################################
+## Plotting some of the results
+########################################################################
+
 # Saving the kalman filtered measurements (predicts)
 Winds = kalman_filter.XX_k1_k1[9:12]         # Predicted alpha from KF
 Winds_covariances = kalman_filter.PP_k1_k1[9:12] # Predicted alpha covariance from KF
@@ -157,15 +159,14 @@ unkf_u = Z[3]
 x      = dt*np.arange(0, N, 1)
 ys     = {'raw u\'s': [unkf_u, 0.9], 
           'kf u\'s': [kf_u, 0.9]}
-make_plots(x, [ys], 'raw and kalman-filtered u velocities', 'Time [s]', ['u\' [m/s]'], printfigs)
+make_plots(x, [ys], 'raw and kalman-filtered u velocities', 'Time [s]', ['u [m/s]'], printfigs)
 
-
-ys1 = {'Wind x over time': [Winds[0], 0.9],
-      'Wind y over time': [Winds[1], 0.9],
-      'Wind z over time': [Winds[2], 0.9]}
-ys2 = {'Wind x variance over time': [Winds_covariances[0], 0.9],
-      'Wind y variance over time': [Winds_covariances[1], 0.9],
-      'Wind z variance over time': [Winds_covariances[2], 0.9]}
+ys1 = {'Wind x': [Winds[0], 0.9],
+      'Wind y': [Winds[1], 0.9],
+      'Wind z': [Winds[2], 0.9]}
+ys2 = {'Wind x variance': [Winds_covariances[0], 0.9],
+      'Wind y variance': [Winds_covariances[1], 0.9],
+      'Wind z variance': [Winds_covariances[2], 0.9]}
 
 make_plots(x, [ys1, ys2], 'Wind over time', 'Time [s]', ['Wind [m/s]', 'Wind variance [m2/s2]'], printfigs, log=1)
 
@@ -184,6 +185,9 @@ ys2 = {'lambda p variance': [lambda_covariances[3], 0.9],
         'lambda q variance': [lambda_covariances[4], 0.9],
         'lambda r variance': [lambda_covariances[5], 0.9]}
 make_plots(x, [ys1, ys2], 'angle bias variances over time', 'Time [s]', ['Bias [rad/s]', 'Variance [rad2/s2]'], printfigs, log=1)
+
+ys = {'Iterations taken by IEKF': [kalman_filter.itr_counts, 0.9]}
+make_plots(x, [ys], 'Iterations taken by IEKF', 'Time [s]', ['Iterations'], printfigs)
 plt.show()
 
 # # writing all results to a csv file

@@ -108,7 +108,7 @@ class IEKF:
         self.ZZ_pred     = np.zeros([self.nm, self.N])  # memory for filter measurement estimate
         self.STD_z       = np.zeros([self.nm, self.N])  # memory for filter measurement standard deviation
 
-        self.IEKFitcount = np.zeros([self.N])           # memory for IEKF iteration count
+        self.itr_counts = np.zeros([self.N])           # memory for IEKF iteration count
         self.eye_n       = np.eye(self.n)               # identity matrix of size n for use in computations
 
 
@@ -207,14 +207,14 @@ class IEKF:
 
         # Construct the Jacobian H = d/dx(h(x))) with h(x) the observation model transition matrix 
         H_jacobian  = self.Hx(0, self.eta1, U_k)
-        F_jacobian  = self.F_jacobian
         
         # Check observability of state
         if (k == 0 and self.itr == 1):
+            F_jacobian  = self.F_jacobian
             rankHF  = self.check_obs_rank(H_jacobian, F_jacobian);
             if (rankHF < self.n):
                 print('\n\n\n\n**********************WARNING**********************\n\n')
-                print(f'The current state is not observable; rank of Observability Matrix is {rankHF}, should be {self.n}')
+                print(f'The current state is not observable; rank of Observability Matrix is {rankHF}, should be {self.n}\n')
 
         # Observation and observation error predictions
         self.z_k1_k      = self.h(0, self.eta1, U_k)                            # prediction of observation (for validation)   
@@ -232,7 +232,7 @@ class IEKF:
         # New observation
         temp = np.reshape(Z_k, (self.nm,1))                  # Need to reshape this Z array to a column vector
         eta2        = self.x_k1_k + Kalman_Gain@(temp - self.z_k1_k - H_jacobian@(self.x_k1_k - self.eta1))
-        self.err         = np.linalg.norm(eta2-self.eta1)/np.linalg.norm(self.eta1)  # difference in updated state estimate 
+        self.err    = np.linalg.norm(eta2-self.eta1)/np.linalg.norm(self.eta1)  # difference in updated state estimate 
                                                                                      # and previous state estimate
         self.H_jacobian  = H_jacobian
         self.Kalman_Gain = Kalman_Gain
@@ -268,7 +268,7 @@ class IEKF:
         self.STD_x_cor[:,k]  = self.std_x_cor.flatten()           # standard deviation of state estimation error (for validation)
         self.STD_z[:,k]      = self.std_z.flatten()               # standard deviation of observation error (for validation)
 
-        self.IEKFitcount[k] = self.itr
+        self.itr_counts[k] = self.itr
         self.itr = 0
         self.err = 2*self.epsilon
 

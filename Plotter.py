@@ -65,7 +65,7 @@ def make_plots(x, ys, title, xlabel, ylabel, save=False, log=None):
     log : int, optional
         Index of the plot to be plotted in log scale, by default None    
     """
-    fig, ax = plt.subplots(len(ys), 1, figsize=(12, 6), sharex=True)
+    fig, ax = plt.subplots(len(ys), 1, figsize=(8, 3), sharex=True)
     fig.suptitle(title, fontsize = 18);
     
     if len(ylabel) != len(ys):
@@ -85,10 +85,3 @@ def make_plots(x, ys, title, xlabel, ylabel, save=False, log=None):
     
     if save:
         plt.savefig(title + '.png')
-
-# x = np.linspace(0, 10, 100)
-# y = {'f(x)': [np.sin(x), 1], 'g(x)': [np.cos(x), 0.5]}
-# y2 = {'f(x)': [np.tan(x), 1], 'g(x)': [np.cos(x), 0.5], 'h(x)': [np.sin(x) + np.cos(x), 0.5]}
-
-# make_plots(x, [y], 'Sine and Cosine', 'x', ['f(x), g(x)', 'sdfg'], save=False, log=None)
-# plt.show()
