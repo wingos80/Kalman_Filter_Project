@@ -28,7 +28,7 @@ filename = 'data/da3211_2_measurements.csv'
 train_data = genfromtxt(filename, delimiter=',').T
 train_data = train_data[:, 1:]
 
-
+xyz        = train_data[0:3]                   # First 3 columns are the simulated xyz's 
 Z          = train_data[3:15]                  # First 9 columns are the gps measurements, last 3 are the airdata sensor measurements
 U          = train_data[-6:]                   # These are the IMU measurements
 
@@ -148,12 +148,13 @@ print(f'Elapsed time: {toc-tic:.5f} s')
 ########################################################################
 
 # Saving the kalman filtered measurements (predicts)
-Winds = kalman_filter.XX_k1_k1[9:12]         # Predicted alpha from KF
-Winds_covariances = kalman_filter.PP_k1_k1[9:12] # Predicted alpha covariance from KF
-new_lambdas = kalman_filter.XX_k1_k1[12:] # Predicted lambda from KF
-lambda_covariances = kalman_filter.PP_k1_k1[12:] # Predicted lambda covariance from KF
-kf_u = kalman_filter.ZZ_pred[3]          # Predicted u from KF
-unkf_u = Z[3]
+xyz_kf             = kalman_filter.XX_k1_k1[0:3]          # Predicted position from KF
+Winds              = kalman_filter.XX_k1_k1[9:12]         # Predicted alpha from KF
+Winds_covariances  = kalman_filter.PP_k1_k1[9:12]         # Predicted alpha covariance from KF
+new_lambdas        = kalman_filter.XX_k1_k1[12:]          # Predicted lambda from KF
+lambda_covariances = kalman_filter.PP_k1_k1[12:]          # Predicted lambda covariance from KF
+kf_u               = kalman_filter.ZZ_pred[3]             # Predicted u from KF
+unkf_u             = Z[3]
 
 
 x      = dt*np.arange(0, N, 1)
@@ -188,6 +189,20 @@ make_plots(x, [ys1, ys2], 'angle bias variances over time', 'Time [s]', ['Bias [
 
 ys = {'Iterations taken by IEKF': [kalman_filter.itr_counts, 0.9]}
 make_plots(x, [ys], 'Iterations taken by IEKF', 'Time [s]', ['Iterations'], printfigs)
+plt.show()
+
+
+# Use 3D scatter plot to visualize the airplane position over time
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+
+ax.scatter(xyz[0], xyz[1], xyz[2], c='r', marker='o', label='Simulated', s=1)
+ax.scatter(xyz_kf[0], xyz_kf[1], xyz_kf[2], c='b', marker='o', label='Kalman filtered', s=1)
+plt.title(f'{filename}\'s reconstructed flight path', fontsize = 18)
+plt.xlabel('x (m)', fontsize = 14)
+plt.ylabel('y (m)', fontsize = 14)
+ax.set_zlabel('z (m)', fontsize = 14)
+ax.legend()
 plt.show()
 
 # # writing all results to a csv file

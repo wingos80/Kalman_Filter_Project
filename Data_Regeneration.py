@@ -33,7 +33,7 @@ for filename in os.listdir(os.getcwd()):
         train_data = genfromtxt(filename, delimiter=',').T
         train_data = train_data[:, 1:]
 
-        time       = train_data[0]
+        times       = train_data[0]
         phi        = train_data[1]*np.pi/180
         theta      = train_data[2]*np.pi/180
         psi        = train_data[3]*np.pi/180
@@ -67,10 +67,10 @@ for filename in os.listdir(os.getcwd()):
         U = np.zeros([6,1])
 
         # Initializing arrays to store the flight path, GPS measurements, and airdata measurements
-        xyz            = np.zeros([3, len(time)])       # x, y, z
-        gps_t          = np.zeros([9, len(time)])       # x, y, z, u, v, w, phi, theta, psi
-        airdata_t      = np.zeros([3, len(time)])       # Vtas, alpha, beta
-        imu_t          = np.zeros([6, len(time)])       # Ax, Ay, Az, p, q, r
+        xyz            = np.zeros([3, len(times)])       # x, y, z
+        gps_t          = np.zeros([9, len(times)])       # x, y, z, u, v, w, phi, theta, psi
+        airdata_t      = np.zeros([3, len(times)])       # Vtas, alpha, beta
+        imu_t          = np.zeros([6, len(times)])       # Ax, Ay, Az, p, q, r
 
         # Storing the GPS and airdata measurements that are already known from the csv filess
         gps_t[3:,:]    = np.array([u_n, v_n, w_n, phi, theta, psi])
@@ -81,10 +81,10 @@ for filename in os.listdir(os.getcwd()):
         result_file.write(f"{xyz[0,0]}, {xyz[1,0]}, {xyz[2,0]}, {gps_t[0,0]}, {gps_t[1,0]}, {gps_t[2,0]}, {gps_t[3,0]}, {gps_t[4,0]}, {gps_t[5,0]}, {gps_t[6,0]}, {gps_t[7,0]}, {gps_t[8,0]}, {airdata_t[0,0]}, {airdata_t[1,0]}, {airdata_t[2,0]}, {imu_t[0,0]}, {imu_t[1,0]}, {imu_t[2,0]}, {imu_t[3,0]}, {imu_t[4,0]}, {imu_t[5,0]}\n")
 
         # Running an numerical integration to recreate the flight
-        for k in range(len(time)-1):
+        for k in range(len(times)-1):
             if k % 500 == 0:
-                print(f"Time step: {k} of {len(time)}")
-            t_vector     = [time[k], time[k+1]]
+                print(f"Time step: {k} of {len(times)}")
+            t_vector     = [times[k], times[k+1]]
             t_vector, X = rk4(kf_calc_f, X, U, t_vector)       # rk4 to integrate state vector to next time step
 
             # Picking out select states to re-create flight path, GPS measurements, and airdata measurements

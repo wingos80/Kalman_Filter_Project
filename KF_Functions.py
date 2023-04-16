@@ -5,8 +5,6 @@
 #   Email: wingyc80@gmail.com
 #   Date: 07-04-2023
 ########################################################################
-
-
 import numpy as np
 
 
@@ -54,8 +52,8 @@ def rk4(fn, xin, uin, t):
         t   = a+j*h
     xout = x
     return t, xout
-        
-        
+
+
 # x = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz]
 # u = [Ax, Ay, Az, p, q, r]
 def kf_calc_f(t, X, U):
@@ -148,84 +146,70 @@ def kf_calc_Fx(t, X, U):
     sin_phi, cos_phi, sin_theta, cos_theta, sin_psi, cos_psi = np.sin(phi), np.cos(phi), np.sin(theta), np.cos(theta), np.sin(psi), np.cos(psi)
     tan_theta = np.tan(theta)
 
+    # saving some commonly used terms to speed up code
+    C = (v*sin_phi + w*cos_phi)
+    D = sin_theta*cos_psi
+    E = sin_theta*sin_psi
+
     # F1 derivatives
-    DFx_1 = np.zeros([1,n])
-    DFx_1[0,3] = cos_theta*cos_psi
-    DFx_1[0,4] = sin_phi*sin_theta*cos_psi - cos_phi*sin_psi
-    DFx_1[0,5] = cos_phi*sin_theta*cos_psi + sin_phi*sin_psi
-    DFx_1[0,6] = (v*cos_phi - w*sin_phi)*sin_theta*cos_psi - (-v*sin_phi - w*cos_phi)*sin_psi
-    DFx_1[0,7] = (-u*sin_theta + (v*sin_phi + w*cos_phi)*cos_theta)*cos_psi
-    DFx_1[0,8] = -(u*cos_theta + (v*sin_phi + w*cos_phi)*sin_theta)*sin_psi - (v*cos_phi - w*sin_phi)*cos_psi
-    DFx_1[0,9] = 1
-    DFx[0,:] = DFx_1
+    DFx[0,3] = cos_theta*cos_psi
+    DFx[0,4] = sin_phi*D - cos_phi*sin_psi
+    DFx[0,5] = cos_phi*D + sin_phi*sin_psi
+    DFx[0,6] = (v*cos_phi - w*sin_phi)*D - (-v*sin_phi - w*cos_phi)*sin_psi
+    DFx[0,7] = (-u*sin_theta + C*cos_theta)*cos_psi
+    DFx[0,8] = -(u*cos_theta + C*sin_theta)*sin_psi - (v*cos_phi - w*sin_phi)*cos_psi
+    DFx[0,9] = 1
 
     # F2 derivatives
-    DFx_2 = np.zeros([1,n])
-    DFx_2[0,3] = cos_theta*sin_psi
-    DFx_2[0,4] = sin_phi*sin_theta*sin_psi + cos_phi*cos_psi
-    DFx_2[0,5] = cos_phi*sin_theta*sin_psi - sin_phi*cos_psi
-    DFx_2[0,6] = (v*cos_phi - w*sin_phi)*sin_theta*sin_psi + (-v*sin_phi - w*cos_phi)*cos_psi
-    DFx_2[0,7] = (-u*sin_theta + (v*sin_phi + w*cos_phi)*cos_theta)*sin_psi
-    DFx_2[0,8] = (u*cos_theta + (v*sin_phi + w*cos_phi)*sin_theta)*cos_psi - (v*cos_phi - w*sin_phi)*sin_psi
-    DFx_2[0,10] = 1
-    DFx[1,:] = DFx_2
+    DFx[1,3] = cos_theta*sin_psi
+    DFx[1,4] = sin_phi*E + cos_phi*cos_psi
+    DFx[1,5] = cos_phi*E - sin_phi*cos_psi
+    DFx[1,6] = (v*cos_phi - w*sin_phi)*E + (-v*sin_phi - w*cos_phi)*cos_psi
+    DFx[1,7] = (-u*sin_theta + C*cos_theta)*sin_psi
+    DFx[1,8] = (u*cos_theta + C*sin_theta)*cos_psi - (v*cos_phi - w*sin_phi)*sin_psi
+    DFx[1,10] = 1
 
     # F3 derivatives
-    DFx_3 = np.zeros([1,n])
-    DFx_3[0,3] = -sin_theta
-    DFx_3[0,4] = sin_phi*cos_theta
-    DFx_3[0,5] = cos_phi*cos_theta
-    DFx_3[0,6] = (v*cos_phi - w*sin_phi)*cos_theta 
-    DFx_3[0,7] = -u*cos_theta - (v*sin_theta + w*cos_theta)*sin_theta
-    DFx_3[0,11] = 1
-    DFx[2,:] = DFx_3
+    DFx[2,3] = -sin_theta
+    DFx[2,4] = sin_phi*cos_theta
+    DFx[2,5] = cos_phi*cos_theta
+    DFx[2,6] = (v*cos_phi - w*sin_phi)*cos_theta 
+    DFx[2,7] = -u*cos_theta - (v*sin_theta + w*cos_theta)*sin_theta
+    DFx[2,11] = 1
 
     # F4 derivatives
-    DFx_4 = np.zeros([1,n])
-    DFx_4[0,4] = r
-    DFx_4[0,5] = -q
-    DFx_4[0,7] = -g*cos_theta
-    DFx_4[0,12:] = np.array([1, 0, 0, 0, -w, v], dtype=object)
-    DFx[3,:] = DFx_4
+    DFx[3,4] = r
+    DFx[3,5] = -q
+    DFx[3,7] = -g*cos_theta
+    DFx[3,12:] = np.array([1, 0, 0, 0, -w, v], dtype=object)
 
     # F5 derivatives
-    DFx_5 = np.zeros([1,n])
-    DFx_5[0,3] = -r
-    DFx_5[0,5] = p
-    DFx_5[0,6] = g*cos_phi*cos_theta
-    DFx_5[0,12:] = np.array([0, 1, 0, w, 0, -u], dtype=object)
-    DFx[4,:] = DFx_5
+    DFx[4,3] = -r
+    DFx[4,5] = p
+    DFx[4,6] = g*cos_phi*cos_theta
+    DFx[4,12:] = np.array([0, 1, 0, w, 0, -u], dtype=object)
 
     # F6 derivatives
-    DFx_6 = np.zeros([1,n])
-    DFx_6[0,3] = q
-    DFx_6[0,4] = -p
-    DFx_6[0,6] = -g*cos_theta*sin_phi
-    DFx_6[0,7] = -g*sin_theta*cos_phi
-    DFx_6[0,12:] = np.array([0, 0, 1, -v, u, 0], dtype=object)
-    DFx[5,:] = DFx_6
-
+    DFx[5,3] = q
+    DFx[5,4] = -p
+    DFx[5,6] = -g*cos_theta*sin_phi
+    DFx[5,7] = -g*sin_theta*cos_phi
+    DFx[5,12:] = np.array([0, 0, 1, -v, u, 0], dtype=object)
     # F7 derivatives
-    DFx_7 = np.zeros([1,n])
-    DFx_7[0,6] = q*cos_phi*tan_theta - r*sin_phi*tan_theta
-    DFx_7[0,7] = q*sin_phi/(cos_theta**2) + r*cos_phi/(cos_theta**2)
-    DFx_7[0,15:] = np.array([1, sin_phi*tan_theta, cos_phi*tan_theta], dtype=object)
-    DFx[6,:] = DFx_7
+    DFx[6,6] = q*cos_phi*tan_theta - r*sin_phi*tan_theta
+    DFx[6,7] = (q*sin_phi + r*cos_phi)/(cos_theta**2)
+    DFx[6,15:] = np.array([1, sin_phi*tan_theta, cos_phi*tan_theta], dtype=object)
 
     # F8 derivatives
-    DFx_8 = np.zeros([1,n])
-    DFx_8[0,6] = -q*sin_phi - r*cos_phi
-    DFx_8[0,16] = cos_phi
-    DFx_8[0,17] = -sin_phi
-    DFx[7,:] = DFx_8
+    DFx[7,6] = -q*sin_phi - r*cos_phi
+    DFx[7,16] = cos_phi
+    DFx[7,17] = -sin_phi
 
     # F9 derivatives
-    DFx_9 = np.zeros([1,n])
-    DFx_9[0,6] = q*cos_phi/cos_theta - r*sin_phi/cos_theta
-    DFx_9[0,7] = q*sin_phi*sin_theta/(cos_theta**2) + r*cos_phi*sin_theta/(cos_theta**2)
-    DFx_9[0,16] = sin_phi/cos_theta
-    DFx_9[0,17] = cos_phi/cos_theta
-    DFx[8,:] = DFx_9
+    DFx[8,6] = q*cos_phi/cos_theta - r*sin_phi/cos_theta
+    DFx[8,7] = (q*sin_phi*sin_theta + r*cos_phi*sin_theta)/(cos_theta**2)
+    DFx[8,16] = sin_phi/cos_theta
+    DFx[8,17] = cos_phi/cos_theta
 
     return DFx
         
@@ -322,88 +306,68 @@ def kf_calc_Hx(t, X, U):
     sin_phi, cos_phi, sin_theta, cos_theta, sin_psi, cos_psi = np.sin(phi), np.cos(phi), np.sin(theta), np.cos(theta), np.sin(psi), np.cos(psi)
     tan_theta = np.tan(theta)
 
+    # saving some commonly used terms to speed up code
+    C = (v*sin_phi + w*cos_phi)
+    D = sin_theta*cos_psi
+    E = sin_theta*sin_psi
+    V = np.sqrt(u**2 + v**2 + w**2)
 
     # H1 derivatives
-    DHx_1 = np.zeros([1,n])
-    DHx_1[0, 0] = 1
-    DHx[0,:] = DHx_1
+    DHx[0, 0] = 1
 
     # H2 derivatives
-    DHx_2 = np.zeros([1,n])
-    DHx_2[0, 1] = 1
-    DHx[1,:] = DHx_2
+    DHx[1, 1] = 1
 
     # H3 derivatives
-    DHx_3 = np.zeros([1,n])
-    DHx_3[0, 2] = 1
-    DHx[2,:] = DHx_3
+    DHx[2, 2] = 1
 
     # H4 derivatives
-    DHx_4 = np.zeros([1,n])
-    DHx_4[0,3] = cos_theta*cos_psi
-    DHx_4[0,4] = sin_phi*sin_theta*cos_psi - cos_phi*sin_psi
-    DHx_4[0,5] = cos_phi*sin_theta*cos_psi + sin_phi*sin_psi
-    DHx_4[0,6] = (v*cos_phi - w*sin_phi)*sin_theta*cos_psi - (-v*sin_phi - w*cos_phi)*sin_psi
-    DHx_4[0,7] = (-u*sin_theta + (v*sin_phi + w*cos_phi)*cos_theta)*cos_psi
-    DHx_4[0,8] = -(u*cos_theta + (v*sin_phi + w*cos_phi)*sin_theta)*sin_psi - (v*cos_phi - w*sin_phi)*cos_psi
-    DHx_4[0,9] = 1
-    DHx[3,:] = DHx_4
+    DHx[3,3] = cos_theta*cos_psi
+    DHx[3,4] = sin_phi*D - cos_phi*sin_psi
+    DHx[3,5] = cos_phi*D + sin_phi*sin_psi
+    DHx[3,6] = (v*cos_phi - w*sin_phi)*D - (-v*sin_phi - w*cos_phi)*sin_psi
+    DHx[3,7] = (-u*sin_theta + C*cos_theta)*cos_psi
+    DHx[3,8] = -(u*cos_theta + C*sin_theta)*sin_psi - (v*cos_phi - w*sin_phi)*cos_psi
+    DHx[3,9] = 1
     
     # H5 derivatives
-    DHx_5 = np.zeros([1,n])
-    DHx_5[0,3] = cos_theta*sin_psi
-    DHx_5[0,4] = sin_phi*sin_theta*sin_psi + cos_phi*cos_psi
-    DHx_5[0,5] = cos_phi*sin_theta*sin_psi - sin_phi*cos_psi
-    DHx_5[0,6] = (v*cos_phi - w*sin_phi)*sin_theta*sin_psi + (-v*sin_phi - w*cos_phi)*cos_psi
-    DHx_5[0,7] = (-u*sin_theta + (v*sin_phi + w*cos_phi)*cos_theta)*sin_psi
-    DHx_5[0,8] = (u*cos_theta + (v*sin_phi + w*cos_phi)*sin_theta)*cos_psi - (v*cos_phi - w*sin_phi)*sin_psi
-    DHx_5[0,10] = 1
-    DHx[4,:] = DHx_5
+    DHx[4,3] = cos_theta*sin_psi
+    DHx[4,4] = sin_phi*E + cos_phi*cos_psi
+    DHx[4,5] = cos_phi*E - sin_phi*cos_psi
+    DHx[4,6] = (v*cos_phi - w*sin_phi)*E + (-v*sin_phi - w*cos_phi)*cos_psi
+    DHx[4,7] = (-u*sin_theta + C*cos_theta)*sin_psi
+    DHx[4,8] = (u*cos_theta + C*sin_theta)*cos_psi - (v*cos_phi - w*sin_phi)*sin_psi
+    DHx[4,10] = 1
 
     # H6 derivatives
-    DHx_6 = np.zeros([1,n])
-    DHx_6[0,3] = -sin_theta
-    DHx_6[0,4] = sin_phi*cos_theta
-    DHx_6[0,5] = cos_phi*cos_theta
-    DHx_6[0,6] = (v*cos_phi - w*sin_phi)*cos_theta 
-    DHx_6[0,7] = -u*cos_theta - (v*sin_theta + w*cos_theta)*sin_theta
-    DHx_6[0,11] = 1
-    DHx[5,:] = DHx_6
+    DHx[5,3] = -sin_theta
+    DHx[5,4] = sin_phi*cos_theta
+    DHx[5,5] = cos_phi*cos_theta
+    DHx[5,6] = (v*cos_phi - w*sin_phi)*cos_theta 
+    DHx[5,7] = -u*cos_theta - (v*sin_theta + w*cos_theta)*sin_theta
+    DHx[5,11] = 1
 
     # H7 derivatives
-    DHx_7 = np.zeros([1,n])
-    DHx_7[0,6] = 1
-    DHx[6,:] = DHx_7
+    DHx[6,6] = 1
 
     # H8 derivatives
-    DHx_8 = np.zeros([1,n])
-    DHx_8[0,7] = 1
-    DHx[7,:] = DHx_8
+    DHx[7,7] = 1
 
     # H9 derivatives
-    DHx_9 = np.zeros([1,n])
-    DHx_9[0,8] = 1
-    DHx[8,:] = DHx_9
+    DHx[8,8] = 1
 
     # H10 derivatives
-    DHx_10 = np.zeros([1,n])
-    DHx_10[0,3] = u/(np.sqrt(u**2 + v**2 + w**2))
-    DHx_10[0,4] = v/(np.sqrt(u**2 + v**2 + w**2))
-    DHx_10[0,5] = w/(np.sqrt(u**2 + v**2 + w**2))
-    DHx[9,:] = DHx_10
+    DHx[9,3] = u/(V)
+    DHx[9,4] = v/(V)
+    DHx[9,5] = w/(V)
 
     # H11 derivatives
-    DHx_11 = np.zeros([1,n])
-    DHx_11[0,3] =-w/(u**2 + w**2)
-    DHx_11[0,5] = u/(u**2 + w**2)
-    DHx[10,:] = DHx_11
-
+    DHx[10,3] =-w/(u**2 + w**2)
+    DHx[10,5] = u/(u**2 + w**2)
     # H12 derivatives
-    DHx_12 = np.zeros([1,n])
-    DHx_12[0,3] = -u*v/(np.sqrt(u**2 + w**2)*(u**2 + v**2 + w**2))
-    DHx_12[0,4] = (u**2 + w**2)/(u**2 + v**2 + w**2)
-    DHx_12[0,5] = -w*v/(np.sqrt(u**2 + w**2)*(u**2 + v**2 + w**2))
-    DHx[11,:] = DHx_12
+    DHx[11,3] = -u*v/(np.sqrt(u**2 + w**2)*(V**2))
+    DHx[11,4] = (u**2 + w**2)/(V**2)
+    DHx[11,5] = -w*v/(np.sqrt(u**2 + w**2)*(V**2))\
 
     return DHx
         
