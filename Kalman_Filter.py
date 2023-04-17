@@ -64,7 +64,7 @@ E_x_0[12:]  = np.array([[0.02], [0.02], [0.02], [0.003], [0.003], [0.003]]) # in
 B           = np.zeros([18,6])               # input matrix
 
 # Initial estimate for covariance matrix
-std_x_0 = 1                                     # initial standard deviation of state prediction error
+std_x_0 = 100                                     # initial standard deviation of state prediction error
 std_x_1 = 1*10**(-3)                            # initial standard deviation of state prediction error
 std_x_2 = 1*10**(+1)                            # initial standard deviation of state prediction error
 P_stds  = [std_x_1, std_x_1, std_x_1, std_x_1, std_x_1, std_x_1, std_x_1, std_x_1, std_x_1, std_x_0, std_x_0, std_x_0, std_x_0, std_x_0, std_x_0, std_x_0, std_x_0, std_x_0]
@@ -78,22 +78,9 @@ std_b_q = 0.003                                 # standard deviation of rate gyr
 std_b_r = 0.003                                 # standard deviation of rate gyro r measurement noise  
 Q_stds  = [std_b_x, std_b_y, std_b_z, std_b_p, std_b_q, std_b_r]
 
-u, v, w = E_x_0[3], E_x_0[4], E_x_0[5]
-phi, theta, psi = E_x_0[6], E_x_0[7], E_x_0[8]
-sin_phi_tan_theta = np.sin(phi) * np.tan(theta)
-cos_phi_tan_theta = np.cos(phi) * np.tan(theta)
-cos_phi = np.cos(phi)
-sin_phi = np.sin(phi)
-sin_phi_div_cos_theta = np.sin(phi) / np.cos(theta)
-cos_phi_div_cos_theta = np.cos(phi) / np.cos(theta)
-# TEMPORARY TEST FOR THE SYSTEM NOISE MATRIX, G is time variant so i need to make it update every time with the new speeds
 G       = np.zeros([18, 6])                      # system noise matrix
 G[3:6, 0:3] = -np.eye(3)                                                                        # accelerometer noise (has a negative because the Ax in the model should be Am MINUS bias MINUS noise!!!!)
-G[3:9, 3:]  = np.array([[0, w, -v], [-w, 0, u], [v, -u, 0], [1, -sin_phi_tan_theta, -cos_phi_tan_theta], [0, -cos_phi, sin_phi], [0, -sin_phi_div_cos_theta, -cos_phi_div_cos_theta]])  # rate gyro noise
-
-# G       = np.zeros([18, 6])                      # system noise matrix
-# G[3:6, 0:3] = -np.eye(3)                                                                        # accelerometer noise (has a negative because the Ax in the model should be Am MINUS bias MINUS noise!!!!)
-# G[3:9, 3:]  = np.array([[0, -1, 1], [1, 0, -1], [-1, 1, 0], [1, 1, 1], [0, 1, -1], [0, 1, 1]])  # rate gyro noise
+G[3:9, 3:]  = np.array([[0, -1, 1], [1, 0, -1], [-1, 1, 0], [1, 1, 1], [0, 1, -1], [0, 1, 1]])  # rate gyro noise
 
 # Measurement noise statistics, all noise are white (unbiased and uncorrelated in time)
 std_gps_x = 2.5                                 # standard deviation of GPS x position measurement noise
@@ -192,9 +179,9 @@ unkf_u             = Z[3]
 
 
 x      = dt*np.arange(0, N, 1)
-# ys     = {'raw u\'s': [unkf_u, 0.9], 
-#           'kf u\'s': [kf_u, 0.9]}
-# make_plots(x, [ys], 'raw and kalman-filtered u velocities', 'Time [s]', ['u [m/s]'], printfigs)
+ys     = {'raw u\'s': [unkf_u, 0.9], 
+          'kf u\'s': [kf_u, 0.9]}
+make_plots(x, [ys], 'raw and kalman-filtered u velocities', 'Time [s]', ['u [m/s]'], printfigs)
 
 print(f' shapes of XX_k1_k1 and ZZ_pred: {Xs.shape}, {kalman_filter.ZZ_pred.shape}')
 dX_Z = Xs[:9,:] - kalman_filter.ZZ_pred[:9,:]
@@ -206,30 +193,30 @@ ys = {'u from Z': [kalman_filter.ZZ_pred[3,:], 0.3],
       'w from X': [Xs[5,:], 0.9],}
 make_plots(x, [ys], 'Difference between predicted and measured states', 'Time [s]', ['Difference [m/s]'], printfigs)
 
-# ys1 = {'Wind x': [Winds[0], 0.9],
-#       'Wind y': [Winds[1], 0.9],
-#       'Wind z': [Winds[2], 0.9]}
-# ys2 = {'Wind x variance': [Winds_covariances[0], 0.9],
-#       'Wind y variance': [Winds_covariances[1], 0.9],
-#       'Wind z variance': [Winds_covariances[2], 0.9]}
+ys1 = {'Wind x': [Winds[0], 0.9],
+      'Wind y': [Winds[1], 0.9],
+      'Wind z': [Winds[2], 0.9]}
+ys2 = {'Wind x variance': [Winds_covariances[0], 0.9],
+      'Wind y variance': [Winds_covariances[1], 0.9],
+      'Wind z variance': [Winds_covariances[2], 0.9]}
 
-# make_plots(x, [ys1, ys2], 'Wind over time', 'Time [s]', ['Wind [m/s]', 'Wind variance [m2/s2]'], printfigs, log=1)
+make_plots(x, [ys1, ys2], 'Wind over time', 'Time [s]', ['Wind [m/s]', 'Wind variance [m2/s2]'], printfigs, log=1)
 
-# ys1 = {'lambda Ax': [new_lambdas[0], 0.9],
-#         'lambda Ay': [new_lambdas[1], 0.9],
-#         'lambda Az': [new_lambdas[2], 0.9]}
-# ys2 = {'lambda Ax variance': [lambda_covariances[0], 0.9],
-#         'lambda Ay variance': [lambda_covariances[1], 0.9],
-#         'lambda Az variance': [lambda_covariances[2], 0.9]}
-# make_plots(x, [ys1, ys2], 'acceleration biases variance over time', 'Time [s]', ['Bias [m/s2]', 'Variance [m2/s4]'], printfigs, log=1)
+ys1 = {'lambda Ax': [new_lambdas[0], 0.9],
+        'lambda Ay': [new_lambdas[1], 0.9],
+        'lambda Az': [new_lambdas[2], 0.9]}
+ys2 = {'lambda Ax variance': [lambda_covariances[0], 0.9],
+        'lambda Ay variance': [lambda_covariances[1], 0.9],
+        'lambda Az variance': [lambda_covariances[2], 0.9]}
+make_plots(x, [ys1, ys2], 'acceleration biases variance over time', 'Time [s]', ['Bias [m/s2]', 'Variance [m2/s4]'], printfigs, log=1)
 
-# ys1 = {'lambda p': [new_lambdas[3], 0.9],
-#         'lambda q': [new_lambdas[4], 0.9],
-#         'lambda r': [new_lambdas[5], 0.9]}
-# ys2 = {'lambda p variance': [lambda_covariances[3], 0.9],
-#         'lambda q variance': [lambda_covariances[4], 0.9],
-#         'lambda r variance': [lambda_covariances[5], 0.9]}
-# make_plots(x, [ys1, ys2], 'angle bias variances over time', 'Time [s]', ['Bias [rad/s]', 'Variance [rad2/s2]'], printfigs, log=1)
+ys1 = {'lambda p': [new_lambdas[3], 0.9],
+        'lambda q': [new_lambdas[4], 0.9],
+        'lambda r': [new_lambdas[5], 0.9]}
+ys2 = {'lambda p variance': [lambda_covariances[3], 0.9],
+        'lambda q variance': [lambda_covariances[4], 0.9],
+        'lambda r variance': [lambda_covariances[5], 0.9]}
+make_plots(x, [ys1, ys2], 'angle bias variances over time', 'Time [s]', ['Bias [rad/s]', 'Variance [rad2/s2]'], printfigs, log=1)
 
 ys = {'Iterations taken by IEKF': [kalman_filter.itr_counts, 0.9]}
 make_plots(x, [ys], 'Iterations taken by IEKF', 'Time [s]', ['Iterations'], printfigs)

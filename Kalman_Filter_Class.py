@@ -228,7 +228,7 @@ class IEKF:
             rankHF  = self.check_obs_rank(H_jacobian, F_jacobian);
             if (rankHF < self.n):
                 print('\n\n\n\n**********************WARNING**********************\n\n')
-                print(f'The current state is not observable; rank of Observability Matrix is {rankHF}, should be {self.n}\n')
+                print(f'The current states are not observable; rank of Observability Matrix is {rankHF}, should be {self.n}\n')
 
         # Observation and observation error predictions
         self.z_k1_k      = self.h(0, eta1, U_k)                            # prediction of observation (for validation)   
