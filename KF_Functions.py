@@ -7,7 +7,6 @@
 ########################################################################
 import numpy as np
 
-
 def rk4(fn, xin, uin, t):
     """
     4th order Runge-Kutta method for solving ODEs
@@ -83,6 +82,7 @@ def kf_calc_f(t, X, U):
 
     # saving the individual state and input names to make the code more readable
     x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
+    Lx, Ly, Lz, Lp, Lq, Lr = X[12], X[13], X[14], X[15], X[16], X[17]
     Ax, Ay, Az, p, q, r = U[0], U[1], U[2], U[3], U[4], U[5]
     #####################################################   
     ## System dynamics go here
@@ -98,12 +98,12 @@ def kf_calc_f(t, X, U):
     Xdot[0] = A*cos_psi - B*sin_psi + Wx
     Xdot[1] = A*sin_psi + B*cos_psi + Wy
     Xdot[2] = -u*sin_theta + (v*sin_phi + w*cos_phi)*cos_theta + Wz
-    Xdot[3] = Ax - g*sin_theta + r*v - q*w
-    Xdot[4] = Ay + g*cos_theta*sin_phi + p*w - r*u
-    Xdot[5] = Az + g*cos_theta*cos_phi + q*u - p*v
-    Xdot[6] = p + q*sin_phi*tan_theta + r*cos_phi*tan_theta
-    Xdot[7] = q*cos_phi - r*sin_phi
-    Xdot[8] = q*sin_phi/cos_theta + r*cos_phi/cos_theta
+    Xdot[3] = (Ax - Lx) - g*sin_theta + (r - Lr)*v - (q - Lq)*w
+    Xdot[4] = (Ay - Ly) + g*cos_theta*sin_phi + (p - Lp)*w - (r - Lr)*u
+    Xdot[5] = (Az - Lz)+ g*cos_theta*cos_phi + (q - Lq)*u - (p - Lp)*v
+    Xdot[6] = (p - Lp) + (q - Lq)*sin_phi*tan_theta + (r - Lr)*cos_phi*tan_theta
+    Xdot[7] = (q - Lq)*cos_phi - (r - Lr)*sin_phi
+    Xdot[8] = (q - Lq)*sin_phi/cos_theta + (r - Lr)*cos_phi/cos_theta
     Xdot[9:] = 0
 
     return Xdot
@@ -136,6 +136,7 @@ def kf_calc_Fx(t, X, U):
     
     # saving the individual state and input names to make the code more readable
     x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
+    Lx, Ly, Lz, Lp, Lq, Lr = X[12], X[13], X[14], X[15], X[16], X[17]
     Ax, Ay, Az, p, q, r = U[0], U[1], U[2], U[3], U[4], U[5]
 
     #####################################################
@@ -178,38 +179,38 @@ def kf_calc_Fx(t, X, U):
     DFx[2,11] = 1
 
     # F4 derivatives
-    DFx[3,4] = r
-    DFx[3,5] = -q
+    DFx[3,4] = (r - Lr)
+    DFx[3,5] = -(q - Lq)
     DFx[3,7] = -g*cos_theta
-    DFx[3,12:] = np.array([1, 0, 0, 0, -w, v], dtype=object)
+    DFx[3,12:] = np.array([-1, 0, 0, 0, w, -v], dtype=object)
 
     # F5 derivatives
-    DFx[4,3] = -r
-    DFx[4,5] = p
+    DFx[4,3] = -(r - Lr)
+    DFx[4,5] = (p - Lp)
     DFx[4,6] = g*cos_phi*cos_theta
-    DFx[4,12:] = np.array([0, 1, 0, w, 0, -u], dtype=object)
+    DFx[4,12:] = np.array([0, -1, 0, -w, 0, u], dtype=object)
 
     # F6 derivatives
-    DFx[5,3] = q
-    DFx[5,4] = -p
+    DFx[5,3] = (q - Lq)
+    DFx[5,4] = -(p - Lp)
     DFx[5,6] = -g*cos_theta*sin_phi
     DFx[5,7] = -g*sin_theta*cos_phi
-    DFx[5,12:] = np.array([0, 0, 1, -v, u, 0], dtype=object)
+    DFx[5,12:] = np.array([0, 0, -1, v, -u, 0], dtype=object)
     # F7 derivatives
-    DFx[6,6] = q*cos_phi*tan_theta - r*sin_phi*tan_theta
-    DFx[6,7] = (q*sin_phi + r*cos_phi)/(cos_theta**2)
-    DFx[6,15:] = np.array([1, sin_phi*tan_theta, cos_phi*tan_theta], dtype=object)
+    DFx[6,6] = (q - Lq)*cos_phi*tan_theta - (r - Lr)*sin_phi*tan_theta
+    DFx[6,7] = ((q - Lq)*sin_phi + (r - Lr)*cos_phi)/(cos_theta**2)
+    DFx[6,15:] = np.array([-1, -sin_phi*tan_theta, -cos_phi*tan_theta], dtype=object)
 
     # F8 derivatives
-    DFx[7,6] = -q*sin_phi - r*cos_phi
-    DFx[7,16] = cos_phi
-    DFx[7,17] = -sin_phi
+    DFx[7,6] = -(q - Lq)*sin_phi - (r - Lr)*cos_phi
+    DFx[7,16] = -cos_phi
+    DFx[7,17] = sin_phi
 
     # F9 derivatives
-    DFx[8,6] = q*cos_phi/cos_theta - r*sin_phi/cos_theta
-    DFx[8,7] = (q*sin_phi*sin_theta + r*cos_phi*sin_theta)/(cos_theta**2)
-    DFx[8,16] = sin_phi/cos_theta
-    DFx[8,17] = cos_phi/cos_theta
+    DFx[8,6] = (q - Lq)*cos_phi/cos_theta - (r - Lr)*sin_phi/cos_theta
+    DFx[8,7] = ((q - Lq)*sin_phi*sin_theta + (r - Lr)*cos_phi*sin_theta)/(cos_theta**2)
+    DFx[8,16] = -sin_phi/cos_theta
+    DFx[8,17] = -cos_phi/cos_theta
 
     return DFx
         
@@ -364,6 +365,7 @@ def kf_calc_Hx(t, X, U):
     # H11 derivatives
     DHx[10,3] =-w/(u**2 + w**2)
     DHx[10,5] = u/(u**2 + w**2)
+
     # H12 derivatives
     DHx[11,3] = -u*v/(np.sqrt(u**2 + w**2)*(V**2))
     DHx[11,4] = (u**2 + w**2)/(V**2)

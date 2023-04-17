@@ -19,6 +19,7 @@ sns.set(style = "darkgrid")                  # Set seaborn style
 # Change the current working directory to the data folder and process all original csv files
 os.chdir("data/")
 for filename in os.listdir(os.getcwd()):
+    # Only process the raw csv files that are not measurements files
     if filename.endswith(".csv") and not filename.endswith("_measurements.csv") :
         
         ########################################################################
@@ -29,7 +30,6 @@ for filename in os.listdir(os.getcwd()):
 
         print(f"\n\nRegenerating data for {filename}...\n\n")
 
-        # filename   = 'data/de3211_1.csv'
         train_data = genfromtxt(filename, delimiter=',').T
         train_data = train_data[:, 1:]
 
@@ -53,7 +53,7 @@ for filename in os.listdir(os.getcwd()):
         filename   = filename.split('.')[0] + '_measurements.csv'
         result_file = open(filename, "w")
 
-        # ADS stands for airdata sensors
+        # writing the column headings in the resulte file, ADS stands for airdata sensors
         result_file.write(f"XYZ_x, XYZ_y, XYZ_z, GPS_x, GPS_y, GPS_z, GPS_u, GPS_v, GPS_w, GPS_phi, GPS_theta, GPS_psi, ADS_vel, ADS_alpha, ADS_beta, IMU_Ax, IMU_Ay, IMU_Az, IMU_p, IMU_q, IMU_r\n")
 
         ########################################################################

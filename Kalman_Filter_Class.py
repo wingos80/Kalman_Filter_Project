@@ -148,6 +148,21 @@ class IEKF:
 
         # x(k+1|k) (prediction)
         self.t, self.x_k1_k   = self.integrator(self.f, self.x_k1_k1, U_k, [self.t_k, self.t_k1])   # add in U_k vector
+        
+        u, v, w = self.x_k1_k[3], self.x_k1_k[4], self.x_k1_k[5]
+        phi, theta, psi = self.x_k1_k[6], self.x_k1_k[7], self.x_k1_k[8]
+        sin_phi_tan_theta = np.sin(phi) * np.tan(theta)
+        cos_phi_tan_theta = np.cos(phi) * np.tan(theta)
+        cos_phi = np.cos(phi)
+        sin_phi = np.sin(phi)
+        sin_phi_div_cos_theta = np.sin(phi) / np.cos(theta)
+        cos_phi_div_cos_theta = np.cos(phi) / np.cos(theta)
+
+        # TEMPORARY TEST FOR THE SYSTEM NOISE MATRIX, G is time variant so i need to make it update every time with the new speeds
+        G       = np.zeros([18, 6])                      # system noise matrix
+        G[3:6, 0:3] = -np.eye(3)                                                                        # accelerometer noise (has a negative because the Ax in the model should be Am MINUS bias MINUS noise!!!!)
+        G[3:9, 3:]  = np.array([[0, w, -v], [-w, 0, u], [v, -u, 0], [1, -sin_phi_tan_theta, -cos_phi_tan_theta], [0, -cos_phi, sin_phi], [0, -sin_phi_div_cos_theta, -cos_phi_div_cos_theta]])  # rate gyro noise
+        self.G = G
 
         # Calc Jacobians, Phi(k+1, k), and Gamma(k+1, k)
         F_jacobian  = self.Fx(0, self.x_k1_k, U_k)
@@ -203,10 +218,9 @@ class IEKF:
             Measurement vector for the k-th time step
         """
         self.itr +=1
-        self.eta1 = self.eta2
-
+        eta1 = self.eta2
         # Construct the Jacobian H = d/dx(h(x))) with h(x) the observation model transition matrix 
-        H_jacobian  = self.Hx(0, self.eta1, U_k)
+        H_jacobian  = self.Hx(0, eta1, U_k)
         
         # Check observability of state
         if (k == 0 and self.itr == 1):
@@ -217,22 +231,17 @@ class IEKF:
                 print(f'The current state is not observable; rank of Observability Matrix is {rankHF}, should be {self.n}\n')
 
         # Observation and observation error predictions
-        self.z_k1_k      = self.h(0, self.eta1, U_k)                            # prediction of observation (for validation)   
+        self.z_k1_k      = self.h(0, eta1, U_k)                            # prediction of observation (for validation)   
         P_zz        = H_jacobian@self.P_k1_k@H_jacobian.transpose() + self.R    # covariance matrix of observation error (for validation)   
-        
-        # Raise exception in case the covariance matrix is too small    
-        try:
-            self.std_z       = np.sqrt(P_zz.diagonal())          # standard deviation of observation error (for validation)    
-        except:
-            self.std_z       = np.zeros([self.nm, 1])                 # standard deviation of observation error (for validation)  
+        self.std_z       = np.sqrt(P_zz.diagonal())          # standard deviation of observation error (for validation)    
 
         # K(k+1) (gain), Kalman Gain
         Kalman_Gain             = self.P_k1_k@H_jacobian.transpose()@np.linalg.inv(P_zz)
     
         # New observation
         temp = np.reshape(Z_k, (self.nm,1))                  # Need to reshape this Z array to a column vector
-        eta2        = self.x_k1_k + Kalman_Gain@(temp - self.z_k1_k - H_jacobian@(self.x_k1_k - self.eta1))
-        self.err    = np.linalg.norm(eta2-self.eta1)/np.linalg.norm(self.eta1)  # difference in updated state estimate 
+        eta2        = self.x_k1_k + Kalman_Gain@(temp - self.z_k1_k - H_jacobian@(self.x_k1_k - eta1))
+        self.err    = np.linalg.norm(eta2-eta1)/np.linalg.norm(eta1)  # difference in updated state estimate 
                                                                                      # and previous state estimate
         self.H_jacobian  = H_jacobian
         self.Kalman_Gain = Kalman_Gain
@@ -278,9 +287,9 @@ class IEKF:
         Check if the IEKF has converged
         """
         bool_val = self.err > self.epsilon and self.itr < self.max_itr
-        if self.itr > self.max_itr:
-            print('Maximum number of iterations reached')
-            print(f'Delta eta: {self.err}, epsilon: {self.epsilon}')
+        if self.itr >= self.max_itr:
+            print('\nMaximum number of iterations reached, test 2')
+            print(f'Delta eta: {self.err}, epsilon: {self.epsilon}\n')
         return bool_val
     
 
