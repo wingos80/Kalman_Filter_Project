@@ -48,30 +48,22 @@ class IEKF:
         """
         Set up the system dynamics, output equations, initial guess of system
         state.
-
         Parameters
         ----------
         x_0 : np.array
             Initial guess of system state
-
         f : function
             System dynamics function
-        
         h : function
             Output equation function
-
         Fx : function
             Jacobian of system dynamics function
-
         Hx : function    
             Jacobian of output equation function
-
         B : np.array
             Input matrix
-
         G : np.array    
             Input noise matrix
-
         integrator : function
             selected integration scheme for integrating the system dynamics
         """
@@ -93,6 +85,11 @@ class IEKF:
         # saving the integation scheme chosen
         self.integrator = integrator
 
+        if B.shape[0] != self.n:
+            raise ValueError(f'B matrix dimension 0 must be the same size as the state vector (B.shape[0] = {B.shape[0]}, self.n = {self.n})')
+        if G.shape[0] != self.n:
+            raise ValueError(f'G matrix dimension 0 must be the same size as the state vector (G.shape[0] = {G.shape[0]}, self.n = {self.n})')
+        
         # set up memory vectors
         self.setup_traces()
 
@@ -107,6 +104,7 @@ class IEKF:
         self.STD_x_cor   = np.zeros([self.n, self.N])   # memory for filter state standard deviation
         self.ZZ_pred     = np.zeros([self.nm, self.N])  # memory for filter measurement estimate
         self.STD_z       = np.zeros([self.nm, self.N])  # memory for filter measurement standard deviation
+        self.innovations = np.zeros([self.nm, self.N])  # memory for filter measurement innovations
 
         self.itr_counts = np.zeros([self.N])           # memory for IEKF iteration count
         self.eye_n       = np.eye(self.n)               # identity matrix of size n for use in computations
@@ -115,7 +113,6 @@ class IEKF:
     def setup_covariances(self, P_stds, Q_stds, R_stds):
         """
         Set up the system state and noise covariance matrices
-
         Parameters
         ----------
         P_stds : list
@@ -134,12 +131,17 @@ class IEKF:
 
         self.P_k1_k1 = self.P_0
 
+        if len(P_stds) != self.n:
+            raise ValueError(f'Number of state estimate stds must match number of states (len(P_stds) = {len(P_stds)}, self.n = {self.n})')
+        if len(Q_stds) != self.m:
+            raise ValueError(f'Number of system noise stds must match number of system noise signals (len(Q_stds) = {len(Q_stds)}, self.m = {self.m})')
+        if len(R_stds) != self.nm:
+            raise ValueError(f'Number of measurement noise stds must match number of measurements (len(R_stds) = {len(R_stds)}, self.nm = {self.nm})')
+
 
     def predict_and_discretize(self, U_k):
         """
-        Predict the next state and discretize the system dynamics and output
-        equations
-
+        Predict the next state and discretize the system dynamics and output equations
         Parameters
         ----------
         U_k : np.array
@@ -149,6 +151,8 @@ class IEKF:
         # x(k+1|k) (prediction)
         self.t, self.x_k1_k   = self.integrator(self.f, self.x_k1_k1, U_k, [self.t_k, self.t_k1])   # add in U_k vector
         
+
+        # TEMPORARY TEST FOR THE SYSTEM NOISE MATRIX, G is time variant so i need to make it update every time with the new speeds
         u, v, w = self.x_k1_k[3], self.x_k1_k[4], self.x_k1_k[5]
         phi, theta, psi = self.x_k1_k[6], self.x_k1_k[7], self.x_k1_k[8]
         sin_phi_tan_theta = np.sin(phi) * np.tan(theta)
@@ -158,10 +162,9 @@ class IEKF:
         sin_phi_div_cos_theta = np.sin(phi) / np.cos(theta)
         cos_phi_div_cos_theta = np.cos(phi) / np.cos(theta)
 
-        # TEMPORARY TEST FOR THE SYSTEM NOISE MATRIX, G is time variant so i need to make it update every time with the new speeds
         G       = np.zeros([18, 6])                      # system noise matrix
         G[3:6, 0:3] = -np.eye(3)                                                                        # accelerometer noise (has a negative because the Ax in the model should be Am MINUS bias MINUS noise!!!!)
-        G[3:9, 3:]  = np.array([[0, w, -v], [-w, 0, u], [v, -u, 0], [1, -sin_phi_tan_theta, -cos_phi_tan_theta], [0, -cos_phi, sin_phi], [0, -sin_phi_div_cos_theta, -cos_phi_div_cos_theta]])  # rate gyro noise
+        G[3:9, 3:]  = np.array([[0, w, -v], [-w, 0, u], [v, -u, 0], [1, -sin_phi_tan_theta, -cos_phi_tan_theta], [0, -cos_phi, sin_phi], [0, -sin_phi_div_cos_theta, -cos_phi_div_cos_theta]], dtype=object)  # rate gyro noise
         self.G = G
 
         # Calc Jacobians, Phi(k+1, k), and Gamma(k+1, k)
@@ -184,12 +187,10 @@ class IEKF:
     def check_obs_rank(self, Hx, Fx):
         """
         Check the observability of the state
-
         Parameters
         ----------
         Hx : np.array
             Jacobian of the output equation
-
         Fx : np.array
             Jacobian of the system dynamics
         """
@@ -205,15 +206,13 @@ class IEKF:
         return rankHF
 
 
-    def run_iteration(self, U_k, Z_k, k):
+    def run_one_iteration(self, U_k, Z_k, k):
         """
         Run one iteration of the IEKF
-
         Parameters
         ----------
         U_k : np.array
             Input vector for the k-th time step
-
         Z_k : np.array
             Measurement vector for the k-th time step
         """
@@ -242,15 +241,21 @@ class IEKF:
         temp = np.reshape(Z_k, (self.nm,1))                  # Need to reshape this Z array to a column vector
         eta2        = self.x_k1_k + Kalman_Gain@(temp - self.z_k1_k - H_jacobian@(self.x_k1_k - eta1))
         self.err    = np.linalg.norm(eta2-eta1)/np.linalg.norm(eta1)  # difference in updated state estimate 
-                                                                                     # and previous state estimate
+                                                                                          # and previous state estimate
         self.H_jacobian  = H_jacobian
         self.Kalman_Gain = Kalman_Gain
+        self.z_k1_k      = self.h(0, eta2, U_k)                            # prediction of observation (for validation)   
         self.eta2        = eta2
 
-
-    def update(self, k):
+    def update(self, U_k, k):
         """
         Update the state and state covariance estimates, and store the results
+        Parameters
+        ----------
+        k : int
+            Current iteration step
+        U_k: np.array
+            Input vector for the k-th time step
         """
 
         # Updating the state estimate
@@ -264,31 +269,37 @@ class IEKF:
         P_k1_k1          = (self.eye_n - K@H_j)@self.P_k1_k@(self.eye_n - K@H_j).transpose() + K@self.R@K.transpose()    
         self.std_x_cor   = np.sqrt(P_k1_k1.diagonal())        # standard deviation of state estimation error (for validation)
 
-        # Update to next time step
-        self.t_k         = self.t_k1 
-        self.t_k1        = self.t_k1 + self.dt
-
-        self.P_k1_k1     = P_k1_k1
+        # calculate the kalman filter 'innovation', difference in measured and predicted observation
+        innovation = self.z_k1_k - self.h(0, self.x_k1_k1, U_k)
 
         # Store results, need to flatten the arrays to store in a matrix
+        self.P_k1_k1     = P_k1_k1
         self.ZZ_pred[:,k]    = self.z_k1_k.flatten()              # predicted observation
         self.XX_k1_k1[:,k]   = self.x_k1_k1.flatten()             # estimated state
         self.PP_k1_k1[:,k]   = self.P_k1_k1.diagonal().flatten()  # estimated state covariance (for validation)
         self.STD_x_cor[:,k]  = self.std_x_cor.flatten()           # standard deviation of state estimation error (for validation)
         self.STD_z[:,k]      = self.std_z.flatten()               # standard deviation of observation error (for validation)
+        self.innovations[:,k] = innovation.flatten()               # kalman filter 'innovation'
 
+        # Update to next time step
+        self.t_k         = self.t_k1 
+        self.t_k1        = self.t_k1 + self.dt
         self.itr_counts[k] = self.itr
         self.itr = 0
         self.err = 2*self.epsilon
 
 
-    def not_converged(self):
+    def not_converged(self, k):
         """
         Check if the IEKF has converged
+        Parameters
+        ----------
+        k : int
+            Current iteration step
         """
         bool_val = self.err > self.epsilon and self.itr < self.max_itr
         if self.itr >= self.max_itr:
-            print('\nMaximum number of iterations reached, test 2')
+            print(f'\nMaximum number of iterations reached at step = {k}')
             print(f'Delta eta: {self.err}, epsilon: {self.epsilon}\n')
         return bool_val
     

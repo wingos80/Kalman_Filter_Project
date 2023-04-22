@@ -33,16 +33,17 @@ for filename in os.listdir(os.getcwd()):
         train_data = genfromtxt(filename, delimiter=',').T
         train_data = train_data[:, 1:]
 
+        # all angles should be in radians
         times       = train_data[0]
-        phi        = train_data[1]*np.pi/180
-        theta      = train_data[2]*np.pi/180
-        psi        = train_data[3]*np.pi/180
+        phi        = train_data[1]
+        theta      = train_data[2]
+        psi        = train_data[3]
         p          = train_data[4]
         q          = train_data[5]
         r          = train_data[6]
         vtas       = train_data[7]
-        alpha      = train_data[9]*np.pi/180
-        beta       = train_data[10]*np.pi/180
+        alpha      = train_data[9]
+        beta       = train_data[10]
         ax         = train_data[12]
         ay         = train_data[13]
         az         = train_data[14]
@@ -84,23 +85,29 @@ for filename in os.listdir(os.getcwd()):
         for k in range(len(times)-1):
             if k % 500 == 0:
                 print(f"Time step: {k} of {len(times)}")
-            t_vector     = [times[k], times[k+1]]
-            t_vector, X = rk4(kf_calc_f, X, U, t_vector)       # rk4 to integrate state vector to next time step
+            dt = times[k+1] - times[k]
+            xyz[:, k+1]   = xyz[:, k] + np.array([dt*u_n[k],dt*v_n[k],dt*w_n[k]])
+            gps_t[:3,k+1] = xyz[:, k+1]
 
-            # Picking out select states to re-create flight path, GPS measurements, and airdata measurements
-            xyz[:, k+1]   = X[0:3,0]
-            gps_t[:3,k+1] = X[0:3,0]
+            # t_vector     = [times[k], times[k+1]]
+            # t_vector, X = rk4(kf_calc_f, X, U, t_vector)       # rk4 to integrate state vector to next time step
+
+            # # Picking out select states to re-create flight path, GPS measurements, and airdata measurements
+            # xyz[:, k+1]   = X[0:3,0]
+            # gps_t[:3,k+1] = X[0:3,0]
             
-            X[3:12] = np.array([[u_n[k+1]], [v_n[k+1]], [w_n[k+1]], [phi[k+1]], [theta[k+1]], [psi[k+1]], [Wx], [Wy], [Wz]])
+            # X[3:12] = np.array([[u_n[k+1]], [v_n[k+1]], [w_n[k+1]], [phi[k+1]], [theta[k+1]], [psi[k+1]], [Wx], [Wy], [Wz]])
 
             # Storing the measurements at each time step
             result_file.write(f"{xyz[0,k+1]}, {xyz[1,k+1]}, {xyz[2,k+1]}, {gps_t[0,k+1]}, {gps_t[1,k+1]}, {gps_t[2,k+1]}, {gps_t[3,k+1]}, {gps_t[4,k+1]}, {gps_t[5,k+1]}, {gps_t[6,k+1]}, {gps_t[7,k+1]}, {gps_t[8,k+1]}, {airdata_t[0,k+1]}, {airdata_t[1,k+1]}, {airdata_t[2,k+1]}, {imu_t[0,k+1]}, {imu_t[1,k+1]}, {imu_t[2,k+1]}, {imu_t[3,k+1]}, {imu_t[4,k+1]}, {imu_t[5,k+1]}\n")
             
+
+        
         # Use 3D scatter plot to visualize the airplane position over time
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
 
-        ax.scatter(xyz[0], xyz[1], xyz[2], c='r', marker='o', label='Measured', s=1)
+        ax.scatter(xyz[0], xyz[1], xyz[2], c='r', marker='o', label='normal integrate', s=1)
         plt.title(f'{filename}\'s reconstructed flight path', fontsize = 18)
         plt.xlabel('x (m)', fontsize = 14)
         plt.ylabel('y (m)', fontsize = 14)

@@ -37,7 +37,7 @@ def rk4(fn, xin, uin, t):
     a   = t[0]
     b   = t[1]
     x   = xin
-    N   = 2
+    N   = 1
     h   = (b - a)/N
     t   = a
 
@@ -104,7 +104,6 @@ def kf_calc_f(t, X, U):
     Xdot[6] = (p - Lp) + (q - Lq)*sin_phi*tan_theta + (r - Lr)*cos_phi*tan_theta
     Xdot[7] = (q - Lq)*cos_phi - (r - Lr)*sin_phi
     Xdot[8] = (q - Lq)*sin_phi/cos_theta + (r - Lr)*cos_phi/cos_theta
-    Xdot[9:] = 0
 
     return Xdot
         

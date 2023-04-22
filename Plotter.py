@@ -1,73 +1,64 @@
+import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 
-def plotter(ax, x, y, ylabel, log=False):
+def plotter(ax, x, y, ylabel, colors=None, log=False):
     """
     Plotter function for general graphs
-
     Parameters
     ----------
     x : np.array
         x-axis vector
-
     y : dictionary
         List of length 2 in each value, 1st element is f(x),
         2nd element is transparency(alpha) of that graph,
         each key is the label for the corresponding graph
-
     title : string
-        Title of the plot
-    
+        Title of the plot    
     xlabel : string
-        Label of the x-axis
-    
+        Label of the x-axis    
     ylabel : string
         Label of the y-axis
-
     save : bool, optional
         Save the figure to a file, by default False        
     """
 
     # fig = plt.figure(figsize=(12,6))
     # ax  = fig.add_subplot()
+    i=0
     for key, value in y.items():
-        ax.plot(x, value[0], label=key, alpha=value[1])
+        ax.plot(x, value[0], color=colors[i] if colors else f'C{i}',label=key, alpha=value[1])
+        i+=1
     if log:
         ax.set_yscale('log')
     ax.grid(True); ax.set_ylabel(ylabel); ax.legend()
     
 
-def make_plots(x, ys, title, xlabel, ylabel, save=False, log=None):
+def make_plots(x, ys, title, xlabel, ylabel, colors=None, save=False, log=None):
     """
-    Make multiple plots in one figure
-    
+    Make multiple plots in one figure    
     Parameters
-    ----------
-    
+    ----------    
     x : np.array
-        x-axis vector
-    
+        x-axis vector    
     ys : list
-        List of dictionaries, each dictionary is a plot
-        
+        List of dictionaries, each dictionary is a plot        
     title : string
-        Title of the plot
-        
+        Title of the plot        
     xlabel : string
-        Label of the x-axis
-        
+        Label of the x-axis        
     ylabel : list
-        List of labels for the y-axis of each subplots
-    
+        List of labels for the y-axis of each subplots    
+    colors : list, optional
+        List of colors for each plot, by default None
     save : bool, optional
-        Save the figure to a file, by default False
-        
+        Save the figure to a file, by default False        
     log : int, optional
         Index of the plot to be plotted in log scale, by default None    
     """
-    fig, ax = plt.subplots(len(ys), 1, figsize=(8, 3), sharex=True)
-    fig.suptitle(title, fontsize = 18);
-    
+    fig, ax = plt.subplots(len(ys), 1, sharex=True)
+    fig.canvas.manager.set_window_title('My Window Title') 
+    plt.subplots_adjust(top=0.965, bottom=0.110, right=0.990, left=0.145)
     if len(ylabel) != len(ys):
         print('---Plot Warning, Number of ylabel must be equal to number of plots')
             
@@ -79,9 +70,16 @@ def make_plots(x, ys, title, xlabel, ylabel, save=False, log=None):
 
     for i, y in enumerate(ys):
         if i == log:
-            plotter(ax[i], x, y, ylabel[i], log=True)
+            plotter(ax[i], x, y, ylabel[i], colors=colors,log=True)
         else:
-            plotter(ax[i], x, y, ylabel[i], log=None)
+            plotter(ax[i], x, y, ylabel[i], colors=colors,log=None)
     
     if save:
-        plt.savefig(title + '.png')
+        plt.savefig(f'figs/{title.replace(" ", "_").replace("-", "_")}.pdf')
+
+# sns.set(style = "darkgrid")                  # Set seaborn style    
+
+# x = np.arange(0,100,1)
+# ys = {'sine': [np.sin(x), 1], 'cosine': [np.cos(x), 1]}
+# make_plots(x, [ys, ys], 'Sine and-Cosine', r'x and $\phi$', [r'$\lambda_{x_r}variance$', r'y $\frac{1}{2}$'], save=True)
+# plt.show()
