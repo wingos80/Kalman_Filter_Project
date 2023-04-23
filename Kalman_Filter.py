@@ -57,13 +57,6 @@ b = 13.3250         # [m]
 S = 24.99           # [m^2]
 c = 1.991           # [m]
 
-# angles = train_data[1:4]
-x      = dt*np.arange(0, num_samples, 1)
-ys = {'raw phi': [train_data[9], 0.9],
-      'raw theta': [train_data[10], 0.9],
-      'raw psi': [train_data[11], 0.9]}
-make_plots(x, [ys], f' raw angles', r'$Time [s]$', [r'$angles [deg?]$'], colors=0, save=0)
-plt.show()
 
 ########################################################################
 ## Set initial values for states and statistics
@@ -76,12 +69,13 @@ plt.show()
 E_x_0       = np.zeros([18,1])                                              # initial estimate of x_k1_k1
 E_x_0[3:9]  = Z[3:9, 0].reshape(6,1)                                        # initial estimate of velocity and flight angles
 E_x_0[9:12] = np.array([[2], [-8], [1]])                                    # initial estimate of Wind velocities
-E_x_0[12:]  = np.array([[0.02], [0.02], [0.02], [0.003*np.pi/180], [0.003*np.pi/180], [0.003*np.pi/180]]) # initial estimate of lambda (biases), angular biases in radians
+# E_x_0[12:]  = np.array([[0.02], [0.02], [0.02], [0.003*np.pi/180], [0.003*np.pi/180], [0.003*np.pi/180]]) # initial estimate of lambda (biases), angular biases in radians
+E_x_0[12:]  = np.array([[0.152251], [-0.0078], [0.051224], [-0.00053], [-0.00015], [-0.00263]]) # initial estimate of lambda (biases), angular biases in radians
 
 B           = np.zeros([18,6])               # input matrix
 
 # Initial estimate for covariance matrix
-std_x_0 = 0.1                                   # initial standard deviation of state prediction error
+std_x_0 = 0.0001                                   # initial standard deviation of state prediction error
 std_x_1 = 1*10**(-3)                            # initial standard deviation of state prediction error
 std_x_2 = 1*10**(+1)                            # initial standard deviation of state prediction error
 state_estimate_stds  = [std_x_1, std_x_1, std_x_1, std_x_1, std_x_1, std_x_1, std_x_1, std_x_1, std_x_1, std_x_0, std_x_0, std_x_0, std_x_0, std_x_0, std_x_0, std_x_0, std_x_0, std_x_0]
@@ -119,14 +113,11 @@ measurement_noise_stds   = [std_gps_x, std_gps_y, std_gps_z, std_gps_u, std_gps_
 ########################################################################
 ## Run the Kalman filter
 ########################################################################
-
 tic           = time.time()
 
 # Initialize the Kalman filter object
 kalman_filter = IEKF(N=num_samples, nm=nm, dt=dt, epsilon=epsilon, maxIterations=maxIterations)
 
-kalman_filter.something = 10
-print(kalman_filter.something)
 # Set up the system in the Kalman filter
 kalman_filter.setup_system(x_0=E_x_0, f=kf_calc_f, h=kf_calc_h, Fx=kf_calc_Fx, Hx=kf_calc_Hx, B=B, G=G, integrator=rk4)
 
@@ -169,8 +160,14 @@ result_file_Xs = open(file_Xs, "w")
 # writing the column headings in the results file
 result_file_Xs.write(f"x_kf, y_kf, z_kf, u_kf, v_kf, w_kf, phi_kf, theta_kf, psi_kf, Wx_kf, Wy_kf, Wz_kf, Lx_kf, Ly_kf, Lz_kf, Lp_kf, Lq_kf, Lr_kf\n")
 Xs, Zs = kalman_filter.XX_k1_k1, kalman_filter.ZZ_pred
-rate_dots = np.zeros_like(Xs[:3])           # angular accceleations in body frame [rad/s^2]
-rate_dots[:,1:] = np.diff(Xs[:3], axis=1)/dt
+
+# Note, the second deriviatives of the angles will only be calculated for the values from the indices [2:-2] of the angle arrays!!!
+rate_dots_X = np.zeros_like(Xs[6:9])                                                     # angular accceleations in body frame [rad/s^2]
+
+_, rate_dots_X[:, 2:-2] = kf_finite_difference(dt, Xs[6:9])                                      # second derivative of the flight angles, from finite difference
+rate_dots_X[:, :2] = rate_dots_X[:, 2].reshape(3,1)                                           # just making the first two angular accelerations to be constant (ZOH)
+rate_dots_X[:, -2:] = rate_dots_X[:, -3].reshape(3,1)                                         # just making the last two angular accelerations to be constant (ZOH)
+
 # writing every entry of the kalman filter states to the result file
 for k in range(num_samples):
     result_file_Xs.write(f"{Xs[0,k]}, {Xs[1,k]}, {Xs[2,k]}, {Xs[3,k]}, {Xs[4,k]}, {Xs[5,k]}, {Xs[6,k]}, {Xs[7,k]}, {Xs[8,k]}, {Xs[9,k]}, {Xs[10,k]}, {Xs[11,k]}, {Xs[12,k]}, {Xs[13,k]}, {Xs[14,k]}, {Xs[15,k]}, {Xs[16,k]}, {Xs[17,k]}\n")
@@ -245,15 +242,15 @@ ys2 = {r'$\sigma^2(\lambda_{p_r})$': [lambda_covariances[3], 1.0],
         r'$\sigma^2(\lambda_{r_r})$': [lambda_covariances[5], 1.0]}
 make_plots(x, [ys1, ys2], f'{file} angle bias variances over time', r'$Time [s]$', [r'$Anuglar Rate Bias [rad/s]$', r'$Variance [rad^2/s^2]$'], save=printfigs, log=1)
 
-ys = {'IMU input 1': [U[0, :], 0.7],
-      'IMU input 2': [U[1, :], 0.7],
-      'IMU input 3': [U[2, :], 0.7]}
-make_plots(x, [ys], f'{file} IMU inputs', r'$Time [s]$', [r'$IMU input$'], save=False)
+# ys = {'IMU input 1': [U[0, :], 0.7],
+#       'IMU input 2': [U[1, :], 0.7],
+#       'IMU input 3': [U[2, :], 0.7]}
+# make_plots(x, [ys], f'{file} IMU inputs', r'$Time [s]$', [r'$IMU input$'], save=False)
 
-ys = {'IMU input 4': [U[3, :], 0.7],
-      'IMU input 5': [U[4, :], 0.7],  
-      'IMU input 6': [U[5, :], 0.7]}  
-make_plots(x, [ys], f'{file} IMU inputs', r'$Time [s]$', [r'$IMU input$'], save=False)
+# ys = {'IMU input 4': [U[3, :], 0.7],
+#       'IMU input 5': [U[4, :], 0.7],  
+#       'IMU input 6': [U[5, :], 0.7]}  
+# make_plots(x, [ys], f'{file} IMU inputs', r'$Time [s]$', [r'$IMU input$'], save=False)
 
 ys = {'Iterations taken by IEKF': [kalman_filter.itr_counts, 1.0]}
 make_plots(x, [ys], f'{file} Iterations taken by IEKF', r'$Time [s]$', [r'$Iterations$'], save=printfigs)
@@ -261,12 +258,8 @@ make_plots(x, [ys], f'{file} Iterations taken by IEKF', r'$Time [s]$', [r'$Itera
 ys = {'innovation': [kalman_filter.innovations[0], 1.0]}
 make_plots(x, [ys], f'{file} innovation', r'$Time [s]$', [r'$Innovation$'], save=printfigs)
 
-# comparing Z_k and X_k
-ys = {'u from x': [Xs[3], 0.7],
-      'u from z': [Zs[3], 0.7],}
-make_plots(x, [ys], f'{file} u from x and z', r'$Time [s]$', [r'$u$'], save=False)
-
-plt.show()
+plt.clf()
+# plt.show()
 
 # # Use 3D scatter plot to visualize the airplane position over time
 # fig = plt.figure()

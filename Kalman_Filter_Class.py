@@ -244,8 +244,10 @@ class IEKF:
                                                                                           # and previous state estimate
         self.H_jacobian  = H_jacobian
         self.Kalman_Gain = Kalman_Gain
-        self.z_k1_k      = self.h(0, eta2, U_k)                            # prediction of observation (for validation)   
+        # self.z_k1_k      = self.h(0, eta2, U_k)                            # prediction of observation (for validation)   
         self.eta2        = eta2
+
+        # print(self.z_k1_k[0:11]-eta2[0:11])
 
     def update(self, U_k, k):
         """

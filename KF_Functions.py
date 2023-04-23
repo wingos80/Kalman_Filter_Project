@@ -7,6 +7,7 @@
 ########################################################################
 import numpy as np
 
+
 def rk4(fn, xin, uin, t):
     """
     4th order Runge-Kutta method for solving ODEs
@@ -51,6 +52,99 @@ def rk4(fn, xin, uin, t):
         t   = a+j*h
     xout = x
     return t, xout
+
+
+def kf_finite_difference(dx,Ys):
+    """
+    Function that applies central difference twice to return both the first and second derivatives of the input array
+    Parameters
+    ----------
+    dx : float
+        step size of the input array
+    Ys : numpy.ndarray
+        input array
+    Returns
+    -------
+    first_derivative : numpy.ndarray
+        first derivative of the input array
+    second_derivative : numpy.ndarray
+        second derivative of the input array
+    """
+    first_derivative, second_derivative = np.zeros_like(Ys), np.zeros_like(Ys)
+    first_derivative[:,1:-1] = (np.diff(Ys, n=1)[:,:-1] + np.diff(Ys, n=1)[:,1:])/(2*dx)  # first derivative of the input array
+    second_derivative[:,1:-1] = (np.diff(first_derivative, n=1)[:,:-1] + np.diff(first_derivative, n=1)[:,1:])/(2*dx)  # second derivative of the input array
+
+    first_derivative[:,0] = first_derivative[:,1]
+    first_derivative[:,-1] = first_derivative[:,-2]
+
+    second_derivative[:,0] = second_derivative[:,2]
+    second_derivative[:,1] = second_derivative[:,2]
+    second_derivative[:,-2] = second_derivative[:,-3]
+    second_derivative[:,-1] = second_derivative[:,-3]
+
+    # print('something', first_derivative.shape)
+
+    print('something', first_derivative.shape)
+    print(second_derivative.shape)
+    return first_derivative, second_derivative
+
+
+def kf_calc_Fc(m, rho, S, V, accs):
+    """
+    Calculates the control force coefficients Cx, Cy, Cz
+    Parameters
+    ----------
+    m : float
+        mass [kg]
+    rho : float
+        air density [kg/m^3]
+    S : float
+        wing area [m^2]
+    V : float
+        airspeed [m/s]
+    accs : numpy.ndarray (3,1)
+        linear accelerations [m/s^2]
+    Returns
+    -------
+    C's : numpy.ndarray (3,1)
+        control force coefficients along the x, y, z axes"""
+    return m*accs/(0.5*rho*S*V**2)
+
+
+def kf_calc_Mc(rho, b, c, S, I, V, rates, accs):
+    """
+    Calculates the control moment coefficients Cm, Cl, Cn
+    Parameters
+    ----------
+    rho : float
+        air density [kg/m^3]
+    b : float
+        wing span [m]
+    c : float
+        mean aerodynamic chord [m]
+    S : float
+        wing area [m^2]
+    I : numpy.ndarray (3,1)
+        moment of inertia matrix [kg*m^2]
+    V : float
+        airspeed [m/s]
+    rates : numpy.ndarray (3,1)
+        angular rates [rad/s]
+    accs : numpy.ndarray (3,1)
+        linear accelerations [m/s^2]
+    Returns
+    -------
+    Cl : float
+        control moment coefficient around the roll axis
+    Cm : float
+        control moment coefficient around the pitch axis
+    Cn : float
+        control moment coefficient around the yaw axis    
+    """
+    Cl = (accs[0]*I[0] + rates[1]*rates[2]*(I[2] - I[1]) - (rates[0]*rates[1] + accs[2])*I[3])/(0.5*rho*V**2*S*b)
+    Cm = (accs[1]*I[1] + rates[1]*rates[0]*(I[0] - I[2]) + (rates[0]**2 - rates[2]**2)*I[3])/(0.5*rho*V**2*S*c)
+    Cn = (accs[2]*I[2] + rates[0]*rates[1]*(I[1] - I[0]) + (rates[1]*rates[2] - accs[0])*I[3])/(0.5*rho*V**2*S*b)
+    return Cl, Cm, Cn
 
 
 # x = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz]
