@@ -230,7 +230,7 @@ class IEKF:
                 print(f'The current states are not observable; rank of Observability Matrix is {rankHF}, should be {self.n}\n')
 
         # Observation and observation error predictions
-        self.z_k1_k      = self.h(0, eta1, U_k)                            # prediction of observation (for validation)   
+        self.z_k1_k      = self.h(0, eta1, U_k)                                 # prediction of observation (for validation)   
         P_zz        = H_jacobian@self.P_k1_k@H_jacobian.transpose() + self.R    # covariance matrix of observation error (for validation)   
         self.std_z       = np.sqrt(P_zz.diagonal())          # standard deviation of observation error (for validation)    
 
@@ -244,10 +244,8 @@ class IEKF:
                                                                                           # and previous state estimate
         self.H_jacobian  = H_jacobian
         self.Kalman_Gain = Kalman_Gain
-        # self.z_k1_k      = self.h(0, eta2, U_k)                            # prediction of observation (for validation)   
         self.eta2        = eta2
 
-        # print(self.z_k1_k[0:11]-eta2[0:11])
 
     def update(self, U_k, k):
         """
@@ -262,7 +260,7 @@ class IEKF:
 
         # Updating the state estimate
         self.x_k1_k1 = self.eta2
-
+        
         # Making some local variables for readability
         K   = self.Kalman_Gain
         H_j = self.H_jacobian
@@ -276,6 +274,7 @@ class IEKF:
 
         # Store results, need to flatten the arrays to store in a matrix
         self.P_k1_k1     = P_k1_k1
+
         self.ZZ_pred[:,k]    = self.z_k1_k.flatten()              # predicted observation
         self.XX_k1_k1[:,k]   = self.x_k1_k1.flatten()             # estimated state
         self.PP_k1_k1[:,k]   = self.P_k1_k1.diagonal().flatten()  # estimated state covariance (for validation)

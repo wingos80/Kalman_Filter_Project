@@ -56,7 +56,8 @@ def rk4(fn, xin, uin, t):
 
 def kf_finite_difference(dx,Ys):
     """
-    Function that applies central difference twice to return both the first and second derivatives of the input array
+    Function that applies central difference twice to return both the first and second derivatives of the input array.
+    Note that due to the nature of central difference, only the derivatives of the inner elements can be calculated.
     Parameters
     ----------
     dx : float
@@ -82,14 +83,10 @@ def kf_finite_difference(dx,Ys):
     second_derivative[:,-2] = second_derivative[:,-3]
     second_derivative[:,-1] = second_derivative[:,-3]
 
-    # print('something', first_derivative.shape)
-
-    print('something', first_derivative.shape)
-    print(second_derivative.shape)
     return first_derivative, second_derivative
 
 
-def kf_calc_Fc(m, rho, S, V, accs):
+def kf_calc_Fc(m, rho, S, Vs, accs):
     """
     Calculates the control force coefficients Cx, Cy, Cz
     Parameters
@@ -100,18 +97,18 @@ def kf_calc_Fc(m, rho, S, V, accs):
         air density [kg/m^3]
     S : float
         wing area [m^2]
-    V : float
+    Vs : numpy.ndarray (1,n)
         airspeed [m/s]
-    accs : numpy.ndarray (3,1)
+    accs : numpy.ndarray (3,n)
         linear accelerations [m/s^2]
     Returns
     -------
-    C's : numpy.ndarray (3,1)
+    Cx's : numpy.ndarray (3,n)
         control force coefficients along the x, y, z axes"""
-    return m*accs/(0.5*rho*S*V**2)
+    return m*accs/(0.5*rho*S*Vs**2)
 
 
-def kf_calc_Mc(rho, b, c, S, I, V, rates, accs):
+def kf_calc_Mc(rho, b, c, S, I, Vs, rates, accs):
     """
     Calculates the control moment coefficients Cm, Cl, Cn
     Parameters
@@ -126,11 +123,11 @@ def kf_calc_Mc(rho, b, c, S, I, V, rates, accs):
         wing area [m^2]
     I : numpy.ndarray (3,1)
         moment of inertia matrix [kg*m^2]
-    V : float
+    Vs : numpy.ndarray (1,n)
         airspeed [m/s]
-    rates : numpy.ndarray (3,1)
+    rates : numpy.ndarray (3,n)
         angular rates [rad/s]
-    accs : numpy.ndarray (3,1)
+    accs : numpy.ndarray (3,n)
         linear accelerations [m/s^2]
     Returns
     -------
@@ -141,10 +138,10 @@ def kf_calc_Mc(rho, b, c, S, I, V, rates, accs):
     Cn : float
         control moment coefficient around the yaw axis    
     """
-    Cl = (accs[0]*I[0] + rates[1]*rates[2]*(I[2] - I[1]) - (rates[0]*rates[1] + accs[2])*I[3])/(0.5*rho*V**2*S*b)
-    Cm = (accs[1]*I[1] + rates[1]*rates[0]*(I[0] - I[2]) + (rates[0]**2 - rates[2]**2)*I[3])/(0.5*rho*V**2*S*c)
-    Cn = (accs[2]*I[2] + rates[0]*rates[1]*(I[1] - I[0]) + (rates[1]*rates[2] - accs[0])*I[3])/(0.5*rho*V**2*S*b)
-    return Cl, Cm, Cn
+    Cl = (accs[0]*I[0] + rates[1]*rates[2]*(I[2] - I[1]) - (rates[0]*rates[1] + accs[2])*I[3])/(0.5*rho*Vs**2*S*b)
+    Cm = (accs[1]*I[1] + rates[1]*rates[0]*(I[0] - I[2]) + (rates[0]**2 - rates[2]**2)*I[3])/(0.5*rho*Vs**2*S*c)
+    Cn = (accs[2]*I[2] + rates[0]*rates[1]*(I[1] - I[0]) + (rates[1]*rates[2] - accs[0])*I[3])/(0.5*rho*Vs**2*S*b)
+    return np.array([Cl, Cm, Cn])
 
 
 # x = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz]

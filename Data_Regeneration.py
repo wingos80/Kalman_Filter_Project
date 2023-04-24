@@ -16,6 +16,12 @@ from KF_Functions import *
 np.random.seed(7)                            # Set random seed for reproducibility
 sns.set(style = "darkgrid")                  # Set seaborn style    
 
+
+########################################################################
+## Start writing measurements to csv files
+########################################################################
+plot = False
+
 # Change the current working directory to the data folder and process all original csv files
 os.chdir("data/")
 for filename in os.listdir(os.getcwd()):
@@ -47,6 +53,11 @@ for filename in os.listdir(os.getcwd()):
         ax         = train_data[12]
         ay         = train_data[13]
         az         = train_data[14]
+        da         = train_data[15]
+        de         = train_data[16]
+        dr         = train_data[17]
+        tc1        = train_data[23]
+        tc2        = train_data[24]
         u_n        = train_data[25]
         v_n        = train_data[26]
         w_n        = train_data[27]
@@ -55,7 +66,7 @@ for filename in os.listdir(os.getcwd()):
         result_file = open(filename, "w")
 
         # writing the column headings in the resulte file, ADS stands for airdata sensors
-        result_file.write(f"XYZ_x, XYZ_y, XYZ_z, GPS_x, GPS_y, GPS_z, GPS_u, GPS_v, GPS_w, GPS_phi, GPS_theta, GPS_psi, ADS_vel, ADS_alpha, ADS_beta, IMU_Ax, IMU_Ay, IMU_Az, IMU_p, IMU_q, IMU_r\n")
+        result_file.write(f"XYZ_x, XYZ_y, XYZ_z, GPS_x, GPS_y, GPS_z, GPS_u, GPS_v, GPS_w, GPS_phi, GPS_theta, GPS_psi, ADS_vel, ADS_alpha, ADS_beta, IMU_Ax, IMU_Ay, IMU_Az, IMU_p, IMU_q, IMU_r, CTRL_da, CTRL_de, CTRL_dr, CTRL_Tc1, CTRL_Tc2, time\n")
 
         ########################################################################
         ## Set up the simulation variables
@@ -79,7 +90,7 @@ for filename in os.listdir(os.getcwd()):
         imu_t[:,:]     = np.array([ax, ay, az, p, q, r])
 
         # Storing the initial measurements
-        result_file.write(f"{xyz[0,0]}, {xyz[1,0]}, {xyz[2,0]}, {gps_t[0,0]}, {gps_t[1,0]}, {gps_t[2,0]}, {gps_t[3,0]}, {gps_t[4,0]}, {gps_t[5,0]}, {gps_t[6,0]}, {gps_t[7,0]}, {gps_t[8,0]}, {airdata_t[0,0]}, {airdata_t[1,0]}, {airdata_t[2,0]}, {imu_t[0,0]}, {imu_t[1,0]}, {imu_t[2,0]}, {imu_t[3,0]}, {imu_t[4,0]}, {imu_t[5,0]}\n")
+        result_file.write(f"{xyz[0,0]}, {xyz[1,0]}, {xyz[2,0]}, {gps_t[0,0]}, {gps_t[1,0]}, {gps_t[2,0]}, {gps_t[3,0]}, {gps_t[4,0]}, {gps_t[5,0]}, {gps_t[6,0]}, {gps_t[7,0]}, {gps_t[8,0]}, {airdata_t[0,0]}, {airdata_t[1,0]}, {airdata_t[2,0]}, {imu_t[0,0]}, {imu_t[1,0]}, {imu_t[2,0]}, {imu_t[3,0]}, {imu_t[4,0]}, {imu_t[5,0]}, {da[0]}, {de[0]}, {dr[0]}, {tc1[0]}, {tc2[0]}, {times[0]}\n")
 
         # Running an numerical integration to recreate the flight
         for k in range(len(times)-1):
@@ -89,27 +100,17 @@ for filename in os.listdir(os.getcwd()):
             xyz[:, k+1]   = xyz[:, k] + np.array([dt*u_n[k],dt*v_n[k],dt*w_n[k]])
             gps_t[:3,k+1] = xyz[:, k+1]
 
-            # t_vector     = [times[k], times[k+1]]
-            # t_vector, X = rk4(kf_calc_f, X, U, t_vector)       # rk4 to integrate state vector to next time step
-
-            # # Picking out select states to re-create flight path, GPS measurements, and airdata measurements
-            # xyz[:, k+1]   = X[0:3,0]
-            # gps_t[:3,k+1] = X[0:3,0]
-            
-            # X[3:12] = np.array([[u_n[k+1]], [v_n[k+1]], [w_n[k+1]], [phi[k+1]], [theta[k+1]], [psi[k+1]], [Wx], [Wy], [Wz]])
-
             # Storing the measurements at each time step
-            result_file.write(f"{xyz[0,k+1]}, {xyz[1,k+1]}, {xyz[2,k+1]}, {gps_t[0,k+1]}, {gps_t[1,k+1]}, {gps_t[2,k+1]}, {gps_t[3,k+1]}, {gps_t[4,k+1]}, {gps_t[5,k+1]}, {gps_t[6,k+1]}, {gps_t[7,k+1]}, {gps_t[8,k+1]}, {airdata_t[0,k+1]}, {airdata_t[1,k+1]}, {airdata_t[2,k+1]}, {imu_t[0,k+1]}, {imu_t[1,k+1]}, {imu_t[2,k+1]}, {imu_t[3,k+1]}, {imu_t[4,k+1]}, {imu_t[5,k+1]}\n")
-            
+            result_file.write(f"{xyz[0,k+1]}, {xyz[1,k+1]}, {xyz[2,k+1]}, {gps_t[0,k+1]}, {gps_t[1,k+1]}, {gps_t[2,k+1]}, {gps_t[3,k+1]}, {gps_t[4,k+1]}, {gps_t[5,k+1]}, {gps_t[6,k+1]}, {gps_t[7,k+1]}, {gps_t[8,k+1]}, {airdata_t[0,k+1]}, {airdata_t[1,k+1]}, {airdata_t[2,k+1]}, {imu_t[0,k+1]}, {imu_t[1,k+1]}, {imu_t[2,k+1]}, {imu_t[3,k+1]}, {imu_t[4,k+1]}, {imu_t[5,k+1]}, {da[k+1]}, {de[k+1]}, {dr[k+1]}, {tc1[k+1]}, {tc2[k+1]}, {times[k+1]}\n")       
 
-        
-        # Use 3D scatter plot to visualize the airplane position over time
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
+        if plot:
+            # Use 3D scatter plot to visualize the airplane position over time
+            fig = plt.figure()
+            ax = fig.add_subplot(projection='3d')
 
-        ax.scatter(xyz[0], xyz[1], xyz[2], c='r', marker='o', label='normal integrate', s=1)
-        plt.title(f'{filename}\'s reconstructed flight path', fontsize = 18)
-        plt.xlabel('x (m)', fontsize = 14)
-        plt.ylabel('y (m)', fontsize = 14)
-        ax.set_zlabel('z (m)', fontsize = 14)
-        plt.show()
+            ax.scatter(xyz[0], xyz[1], xyz[2], c='r', marker='o', label='normal integrate', s=1)
+            plt.title(f'{filename}\'s reconstructed flight path', fontsize = 18)
+            plt.xlabel('x (m)', fontsize = 14)
+            plt.ylabel('y (m)', fontsize = 14)
+            ax.set_zlabel('z (m)', fontsize = 14)
+            plt.show()
