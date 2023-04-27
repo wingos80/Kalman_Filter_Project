@@ -150,7 +150,6 @@ class IEKF:
 
         # x(k+1|k) (prediction)
         self.t, self.x_k1_k   = self.integrator(self.f, self.x_k1_k1, U_k, [self.t_k, self.t_k1])   # add in U_k vector
-        
 
         # TEMPORARY TEST FOR THE SYSTEM NOISE MATRIX, G is time variant so i need to make it update every time with the new speeds
         
@@ -258,6 +257,7 @@ class IEKF:
 
         # Updating the state estimate
         self.x_k1_k1 = self.eta2
+        self.x_k1_k1_dot = self.f(0, self.x_k1_k1, U_k) # for validation
         
         # Making some local variables for readability
         K   = self.Kalman_Gain

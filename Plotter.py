@@ -23,8 +23,6 @@ def plotter(ax, x, y, ylabel, colors=None, log=False):
         Save the figure to a file, by default False        
     """
 
-    # fig = plt.figure(figsize=(12,6))
-    # ax  = fig.add_subplot()
     i=0
     for key, value in y.items():
         ax.plot(x, value[0], color=colors[i] if colors else f'C{i}',label=key, alpha=value[1])
@@ -76,10 +74,3 @@ def make_plots(x, ys, title, xlabel, ylabel, colors=None, save=False, log=None):
     
     if save:
         plt.savefig(f'{title.replace(" ", "_").replace("-", "_")}.pdf')
-
-# sns.set(style = "darkgrid")                  # Set seaborn style    
-
-# x = np.arange(0,100,1)
-# ys = {'sine': [np.sin(x), 1], 'cosine': [np.cos(x), 1]}
-# make_plots(x, [ys, ys], 'Sine and-Cosine', r'x and $\phi$', [r'$\lambda_{x_r}variance$', r'y $\frac{1}{2}$'], save=True)
-# plt.show()

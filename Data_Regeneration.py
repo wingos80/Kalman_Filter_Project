@@ -14,10 +14,9 @@ from numpy import genfromtxt
 import matplotlib.pyplot as plt
 from KF_Functions import *
 from Plotter import *
-# import time, sys, os, control.matlab
+
 np.random.seed(7)                            # Set random seed for reproducibility
 sns.set(style = "darkgrid")                  # Set seaborn style    
-
 
 ########################################################################
 ## Start writing measurements to csv files
@@ -125,16 +124,10 @@ for filename in files:
     u_n = u_n + Wx
     v_n = v_n + Wy
     w_n = w_n + Wz
+
     ########################################################################
     ## Set up the simulation variables
     ########################################################################
-
-    # Initial state vector, 
-    #  X = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz, lambdax, lambday, lambdaz, lambdap, lambdaq, lambdar]^T
-    #  U = [Ax, Ay, Az, p, q, r]^T
-    X = np.array([[0],[0],[0], [u_n[0]], [v_n[0]], [w_n[0]], [phi[0]], [theta[0]], [psi[0]], [Wx], [Wy], [Wz], [0], [0], [0], [0], [0], [0]])
-    U = np.zeros([6,1])
-
     # Initializing arrays to store the flight path, GPS measurements, and airdata measurements
     xyz            = np.zeros([3, len(times)])       # x, y, z
     gps_t          = np.zeros([9, len(times)])       # x, y, z, u, v, w, phi, theta, psi
@@ -151,13 +144,13 @@ for filename in files:
         # Storing the initial measurements
         result_file.write(f"{xyz[0,0]}, {xyz[1,0]}, {xyz[2,0]}, {gps_t[0,0]}, {gps_t[1,0]}, {gps_t[2,0]}, {gps_t[3,0]}, {gps_t[4,0]}, {gps_t[5,0]}, {gps_t[6,0]}, {gps_t[7,0]}, {gps_t[8,0]}, {airdata_t[0,0]}, {airdata_t[1,0]}, {airdata_t[2,0]}, {imu_t[0,0]}, {imu_t[1,0]}, {imu_t[2,0]}, {imu_t[3,0]}, {imu_t[4,0]}, {imu_t[5,0]}, {da[0]}, {de[0]}, {dr[0]}, {tc1[0]}, {tc2[0]}, {times[0]}\n")
 
-    # Running an numerical integration to recreate the flight
+    # Running numerical integration to recreate the flight positions
     for k in range(len(times)-1):
         # printing out progress in terminal
         if k % 500 == 0:
             print(f"Time step: {k} of {len(times)}")
 
-        # numerical integration to find positions
+        # Numerical integration to find positions
         dt = times[k+1] - times[k]
         xyz[:, k+1]   = xyz[:, k] + np.array([dt*u_n[k],dt*v_n[k],dt*w_n[k]])
         gps_t[:3,k+1] += xyz[:, k+1]
@@ -183,8 +176,6 @@ for filename in files:
     plt.ylabel('y (m)', fontsize = 14)
     axx.set_zlabel('z (m)', fontsize = 14)
     lgnd = plt.legend(scatterpoints=6, fontsize=10)
-    # lgnd.legendHandles[0]._sizes = [30]
-    # lgnd.legendHandles[1]._sizes = [30]
     plt.tight_layout()
     
     if save:
@@ -241,9 +232,11 @@ for filename in files:
             'z true': [xyz[2,:], alpha_t],
             'z noise': [gps_t[2,:], alpha_n]}
     make_plots(x, [ys], f'{figs_destination} true vs noise positions', r'Time $[s]$', [r'positions $[m]$'], save=save, colors=colors)
+
     if show_plot:
         plt.show()
 
     plt.close('all')
+
 boom = time.time()
 print(f'Total time: {round(boom-bing,6)}s')

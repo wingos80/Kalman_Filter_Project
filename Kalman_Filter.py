@@ -32,6 +32,8 @@ all_results_file.write(f"x_kf, y_kf, z_kf, u_kf, v_kf, w_kf, phi_kf, theta_kf, p
 os.chdir("data/regenerated/")
 files = os.listdir(os.getcwd())
 os.chdir("../..")
+
+time1 = time.time()
 for filename in files:
     print(f"\n\nFiltering data for {filename}...\n\n")
     ########################################################################
@@ -68,18 +70,13 @@ for filename in files:
     ########################################################################
     E_x_0       = np.zeros([18,1])                                                                            # initial estimate of x_k1_k1
     E_x_0[3:9]  = Z[3:9, 0].reshape(6,1)                                                                      # initial estimate of velocity and flight angles
-    E_x_0[9:12] = np.array([[2], [-8], [1]])                                                                  # initial estimate of Wind velocities
-    E_x_0[12:]  = np.array([[0.02], [0.02], [0.02], [0.003*np.pi/180], [0.003*np.pi/180], [0.003*np.pi/180]]) # initial estimate of lambda (biases), angular biases in radians
+    E_x_0[9:12] = np.array([[20], [-80], [10]])                                                                  # initial estimate of Wind velocities
+    E_x_0[12:]  = np.array([[0.2], [0.2], [0.2], [0.03*np.pi/180], [0.03*np.pi/180], [0.03*np.pi/180]]) # initial estimate of lambda (biases), angular biases in radians
     B           = np.zeros([18,6])                                                                            # input matrix
 
-    # # Initial state standard deviation estimates
-    # # P_stds  = [100.5, 100.5, 100.5, 100.1, 100.1, 100.1, 100.01, 100.01, 100.01, 100, 100, 100, 100, 100, 100, 100, 100, 100]
-    P_stds  = [1, 1, 1, 5, 5, 5, 0.01, 0.01, 0.01, 0.5, 8, 1, 0.002, 0.002, 0.002, 0.0003*np.pi/180, 0.0003*np.pi/180, 0.0003*np.pi/180]
-    # P_stds  = [1, 1, 1, 5, 5, 5, 0.01, 0.01, 0.01, 1, 1, 1, 1,1,1,1,0,0]
-    # # P_stds  = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    # # P_stds  = [100.5, 100.5, 100.5, 10.1, 10.1, 10.1, 10.01, 10.01, 10.01, 10.5, 10.5, 10.5, 10.1, 10.1, 10.1, 10.1, 10.1, 10.1]
-    # # P_stds  = [0.5, 0.5, 0.5, 2.1, 2.1, 2.1, 0.2, 0.2, 0.2, 10.5, 10.5, 10.5, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1]
-
+    # Initial state standard deviation estimates
+    P_stds  = [1, 1, 1, 5, 5, 5, 0.01, 0.01, 0.01, 2, 8, 1, 0.002, 0.002, 0.002, 0.0003*np.pi/180, 0.0003*np.pi/180, 0.0003*np.pi/180]
+    
     # System noises, all noise are white (unbiased and uncorrelated in time)
     std_b_x = 0.02                                  # standard deviation of accelerometer x measurement noise
     std_b_y = 0.02                                  # standard deviation of accelerometer y measurement noise
@@ -130,13 +127,15 @@ for filename in files:
 
     # Run the filter through all N samples
     for k in range(num_samples):
+        # Print progress
         if k % 100 == 0:
             tonc = time.time()
             print(f'{filename}: Sample {k} of {num_samples} ({k/num_samples*100:.3f} %), time elapsed: {tonc-tic:.2f} s')
             print(f'    Current estimate of system states:\n{kalman_filter.x_k1_k1}\n')
         bing = time.time()
+        
         # Picking out the k-th entry in the input and measurement vectors
-        U_k = U[:,k]  
+        U_k = U[:,k]
         Z_k = Z[:,k]
 
         # Predict and discretize the system
@@ -153,9 +152,8 @@ for filename in files:
         
     toc = time.time()
 
-    print(f'Elapsed time: {toc-tic:.5f} s')
+    print(f'\nElapsed time: {toc-tic:.5f} s\n')
     
-
     ########################################################################
     ## Saving the results into csv files
     ########################################################################
@@ -164,7 +162,7 @@ for filename in files:
     result_filename = filename.replace('measurements', 'filtered')
 
     if save:
-        result_file = open('data/filtered/' + result_filename, "w")
+        result_file = open('data/filtered/d/' + result_filename, "w")
 
         # writing the column headings in the results file
         result_file.write(f"x_kf, y_kf, z_kf, u_kf, v_kf, w_kf, phi_kf, theta_kf, psi_kf, Wx_kf, Wy_kf, Wz_kf, Lx_kf, Ly_kf, Lz_kf, Lp_kf, Lq_kf, Lr_kf, da, de, dr, Tc1, Tc2, V, alpha, beta\n")
@@ -179,8 +177,8 @@ for filename in files:
     ########################################################################
     ## Plotting all the filtered data and the kalman estimated values
     ########################################################################
-        
-    figs_destination = 'figs/filtered_figs/' + filename.split('_m')[0]
+    
+    figs_destination = 'figs/filtered_figs/d/' + filename.split('_m')[0]
 
     # Saving the kalman filtered predictions
     Winds              = Xs[9:12]                             # Predicted alpha from KF
@@ -205,7 +203,7 @@ for filename in files:
     plt.tight_layout()
 
     if printfigs:
-        print(f"\n********************************\nsaving figurse to location: {figs_destination}\n********************************\n")
+        print(f"\n***************************************\nSaving figures to location: {figs_destination}\n***************************************\n")
         plt.savefig(f'{figs_destination}_xyz.pdf')
 
     x      = dt*np.arange(0, num_samples, 1)
@@ -255,7 +253,6 @@ for filename in files:
     ys2 = {r'$\sigma^2(W_x)$': [Winds_covariances[0], 1.0],
         r'$\sigma^2(W_y)$': [Winds_covariances[1], 1.0],
         r'$\sigma^2(W_z)$': [Winds_covariances[2], 1.0]}
-
     make_plots(x, [ys1, ys2], f'{figs_destination} Wind over time', r'Time $[s]$', [r'Wind $[m/s]$', r'Variance $[m^2/s^2]$'], save=printfigs, log=1)
 
     ys1 = {r'$\lambda_{x_r}$': [new_lambdas[0], 1.0],
@@ -293,7 +290,9 @@ for filename in files:
     if show_plot:
         plt.show()
     
+    plt.close('all')
 
 all_results_file.close()
-
+time2 = time.time()
+print(f"\nTotal time taken: {round(time2-time1,6)} s")
 print("\n\n\n***************************************\nAll filtering finished\n***************************************\n\n\n")

@@ -54,16 +54,19 @@ def rk4(fn, xin, uin, t):
     return t, xout
 
 
-def kf_finite_difference(dx,Ys):
+def kf_finite_difference(dx, Ys, step_size=10):
     """
-    Function that applies central difference twice to return both the first and second derivatives of the input array.
-    Note that due to the nature of central difference, only the derivatives of the inner elements can be calculated.
+    Function that numerically differentiates the given Ys array along axis=1,
+    using a finite difference method. The step size of the differentiator can
+    be adjusted to reduce noise.
     Parameters
     ----------
     dx : float
         step size of the input array
     Ys : numpy.ndarray
         input array
+    step_size : int
+        step size of the finite differentiator, bigger step means less noisey derivative 
     Returns
     -------
     first_derivative : numpy.ndarray
@@ -71,17 +74,27 @@ def kf_finite_difference(dx,Ys):
     second_derivative : numpy.ndarray
         second derivative of the input array
     """
+    # Initialize arrays to store derivatives
     first_derivative, second_derivative = np.zeros_like(Ys), np.zeros_like(Ys)
-    first_derivative[:,1:-1] = (np.diff(Ys, n=1)[:,:-1] + np.diff(Ys, n=1)[:,1:])/(2*dx)  # first derivative of the input array
-    second_derivative[:,1:-1] = (np.diff(first_derivative, n=1)[:,:-1] + np.diff(first_derivative, n=1)[:,1:])/(2*dx)  # second derivative of the input array
+    _ = np.zeros((Ys.shape[0],1))                                                     # useful array to prepend to the derivative arrays
 
-    first_derivative[:,0] = first_derivative[:,1]
-    first_derivative[:,-1] = first_derivative[:,-2]
+    # First derivative
+    temp = np.diff(Ys[:,::step_size], n=1, prepend=_)/(step_size*dx)                  # array containing the first derivatives
+    temp[:,0] = temp[:,3]
+    temp2 = np.arange(0, Ys.shape[1])
 
-    second_derivative[:,0] = second_derivative[:,2]
-    second_derivative[:,1] = second_derivative[:,2]
-    second_derivative[:,-2] = second_derivative[:,-3]
-    second_derivative[:,-1] = second_derivative[:,-3]
+    # Interpolate the first derivative array to the original Ys array size
+    for i, val in enumerate(Ys):
+        first_derivative[i,:] = np.interp(temp2, temp2[::step_size], temp[i,:])
+
+    # Second derivative
+    temp = np.diff(first_derivative[:,::step_size], n=1, prepend=_)/(step_size*dx)    # array containing the second derivatives
+    temp[:,0] = temp[:,3]
+    temp2 = np.arange(0, Ys.shape[1])
+
+    # Interpolate the second derivative array to the original Ys array size
+    for i, val in enumerate(Ys):
+        second_derivative[i,:] = np.interp(temp2, temp2[::step_size], temp[i,:])
 
     return first_derivative, second_derivative
 
