@@ -78,7 +78,7 @@ for filename in files:
 
         # # Initial state standard deviation estimates
         # # P_stds  = [100.5, 100.5, 100.5, 100.1, 100.1, 100.1, 100.01, 100.01, 100.01, 100, 100, 100, 100, 100, 100, 100, 100, 100]
-        P_stds  = [1, 1, 1, 5, 5, 5, 0.01, 0.01, 0.01, 2, 8, 1, 0.002, 0.002, 0.002, 0.0003*np.pi/180, 0.0003*np.pi/180, 0.0003*np.pi/180]
+        P_stds  = [1, 1, 1, 5, 5, 5, 0.01, 0.01, 0.01, 0.5, 8, 1, 0.002, 0.002, 0.002, 0.0003*np.pi/180, 0.0003*np.pi/180, 0.0003*np.pi/180]
         # P_stds  = [1, 1, 1, 5, 5, 5, 0.01, 0.01, 0.01, 1, 1, 1, 1,1,1,1,0,0]
         # # P_stds  = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         # # P_stds  = [100.5, 100.5, 100.5, 10.1, 10.1, 10.1, 10.01, 10.01, 10.01, 10.5, 10.5, 10.5, 10.1, 10.1, 10.1, 10.1, 10.1, 10.1]
@@ -194,13 +194,29 @@ for filename in files:
         colors=['C0','C1','C2','C0','C1','C2']
         file = filename.split('_measurements')[0].replace('data/', 'figs/filtered_figs/')
 
+        # Use 3D scatter plot to visualize the airplane position over time
+        fig = plt.figure(num=f'{filename}\'s reconstructed flight path')
+        ax = fig.add_subplot(projection='3d')
+
+        ax.scatter(Z[0, ::23], Z[1, ::23], Z[2, ::23], c='r', marker='o', label='Noisey', alpha=0.3, s=1)
+        ax.scatter(Xs[0, ::23], Xs[1, ::23], Xs[2, ::23], c='b', marker='o', label='Filtered', alpha=0.4, s=1)
+        ax.scatter(xyz[0, ::23], xyz[1, ::23], xyz[2, ::23], c='g', marker='o', label='True', alpha=0.4, s=1)
+        plt.xlabel('x (m)', fontsize = 14)
+        plt.ylabel('y (m)', fontsize = 14)
+        ax.set_zlabel('z (m)', fontsize = 14)
+        lgnd = plt.legend(scatterpoints=6, fontsize=10)
+        plt.tight_layout()
+
+        if printfigs:
+            plt.savefig(f'{file}_xyz.pdf')
+
         x      = dt*np.arange(0, num_samples, 1)
 
         ys = {'u body': [Xs[3], 0.9],
                 'v body': [Xs[4], 0.9],
                 'w body': [Xs[5], 0.9]}
         
-        make_plots(x, [ys], f'{file} estimated body velocities', r'Time $[s]$', [r'body velocities $[m/s]$'], colors=colors)
+        make_plots(x, [ys], f'{file} estimated body velocities', r'Time $[s]$', [r'body velocities $[m/s]$'], save=printfigs, colors=colors)
 
         ys = {r'raw x': [Z[0], 0.3],
             r'raw y': [Z[1], 0.3],
@@ -263,12 +279,12 @@ for filename in files:
         ys = {r'$A_x$': [U[0, :], 0.7],
                 r'$A_y$': [U[1, :], 0.7],
                 r'$A_z$': [U[2, :], 0.7]}
-        make_plots(x, [ys], f'{file} IMU accelerations', r'Time $[s]$', [r'Accelerations $[m/s^2]$'], save=False)
+        make_plots(x, [ys], f'{file} IMU accelerations', r'Time $[s]$', [r'Accelerations $[m/s^2]$'], save=printfigs)
 
         ys = {r'$A_p$': [U[3, :], 0.7],
                 r'$A_q$': [U[4, :], 0.7],  
                 r'$A_r$': [U[5, :], 0.7]}  
-        make_plots(x, [ys], f'{file} IMU attitude rates', r'Time $[s]$', [r'Attitude rates $[rad/s]$'], save=False)
+        make_plots(x, [ys], f'{file} IMU attitude rates', r'Time $[s]$', [r'Attitude rates $[rad/s]$'], save=printfigs)
 
         ys = {'Iterations taken by IEKF': [kalman_filter.itr_counts, 1.0]}
         make_plots(x, [ys], f'{file} Iterations taken by IEKF', r'Time $[s]$', [r'Iterations'], save=printfigs)
@@ -276,21 +292,6 @@ for filename in files:
         ys = {'innovation': [kalman_filter.innovations[0], 1.0]}
         make_plots(x, [ys], f'{file} innovation', r'Time $[s]$', [r'Total Innovation'], save=printfigs)
 
-        # Use 3D scatter plot to visualize the airplane position over time
-        fig = plt.figure(num=f'{filename}\'s reconstructed flight path')
-        ax = fig.add_subplot(projection='3d')
-
-        ax.scatter(Z[0], Z[1], Z[2], c='r', marker='o', label='Noisey', alpha=0.3, s=1)
-        ax.scatter(Xs[0], Xs[1], Xs[2], c='b', marker='o', label='Filtered', alpha=0.5, s=1)
-        ax.scatter(xyz[0], xyz[1], xyz[2], c='g', marker='o', label='True', alpha=0.5, s=1)
-        plt.xlabel('x (m)', fontsize = 14)
-        plt.ylabel('y (m)', fontsize = 14)
-        ax.set_zlabel('z (m)', fontsize = 14)
-        ax.legend()
-        plt.tight_layout()
-
-        if printfigs:
-            plt.savefig(f'{file}_xyz.pdf')
         if show_plot:
             plt.show()
     

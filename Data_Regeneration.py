@@ -9,6 +9,7 @@
 import numpy as np
 import seaborn as sns
 import os
+import time
 from numpy import genfromtxt
 import matplotlib.pyplot as plt
 from KF_Functions import *
@@ -32,14 +33,16 @@ colors=['C0', 'C0', 'C1', 'C1', 'C2', 'C2']
 os.chdir("data/")
 files = os.listdir(os.getcwd())
 os.chdir("..")
+
+bing = time.time()
 for filename in files:
     # Only process the raw csv files that are not measurements files
     if filename.endswith(".csv") and not (filename.endswith("_measurements.csv") or filename.endswith("all_results.csv")):
-                
+        
         ########################################################################
         ## Data I/O managing
         ########################################################################
-        
+
         print(f"\n\nRegenerating data for {filename}...\n\n")
 
         train_data = genfromtxt('data/'+filename, delimiter=',').T
@@ -64,9 +67,9 @@ for filename in files:
         dr         = train_data[17]
         tc1        = train_data[23]
         tc2        = train_data[24]
-        u_n        = train_data[25]
-        v_n        = train_data[26]
-        w_n        = train_data[27]
+        u_n        = train_data[25]    # velocities are in the local earth frame (north, East, Down frame!!)
+        v_n        = train_data[26]    # velocities are in the local earth frame (north, East, Down frame!!)
+        w_n        = train_data[27]    # velocities are in the local earth frame (north, East, Down frame!!)
 
         if save:
             filename_new = 'data/' + filename.split('.')[0] + '_measurements.csv'
@@ -120,6 +123,11 @@ for filename in files:
         noise_imu = np.random.normal(np.zeros((6,1)), stds_imu, (6, len(times)))
 
         Wx, Wy, Wz = 2, -8, 1
+
+        #  Adding wind velocities to the 3 velocity components
+        u_n = u_n + Wx
+        v_n = v_n + Wy
+        w_n = w_n + Wz
         ########################################################################
         ## Set up the simulation variables
         ########################################################################
@@ -155,13 +163,13 @@ for filename in files:
             # numerical integration to find positions
             dt = times[k+1] - times[k]
             xyz[:, k+1]   = xyz[:, k] + np.array([dt*u_n[k],dt*v_n[k],dt*w_n[k]])
-            gps_t[:3,k+1] += xyz[:, k+1] + np.array([dt*Wx,dt*Wy,dt*Wz])
-
-            print(f'gps x and xyz x: {gps_t[0,k+1]}, {xyz[0,k+1]}')
+            gps_t[:3,k+1] += xyz[:, k+1]
+            
             if save:
                 # Storing the measurements at each time step if desired
                 result_file.write(f"{xyz[0,k+1]}, {xyz[1,k+1]}, {xyz[2,k+1]}, {gps_t[0,k+1]}, {gps_t[1,k+1]}, {gps_t[2,k+1]}, {gps_t[3,k+1]}, {gps_t[4,k+1]}, {gps_t[5,k+1]}, {gps_t[6,k+1]}, {gps_t[7,k+1]}, {gps_t[8,k+1]}, {airdata_t[0,k+1]}, {airdata_t[1,k+1]}, {airdata_t[2,k+1]}, {imu_t[0,k+1]}, {imu_t[1,k+1]}, {imu_t[2,k+1]}, {imu_t[3,k+1]}, {imu_t[4,k+1]}, {imu_t[5,k+1]}, {da[k+1]}, {de[k+1]}, {dr[k+1]}, {tc1[k+1]}, {tc2[k+1]}, {times[k+1]}\n")       
-
+        bong = time.time()
+        print(f'Elapsed time: {round(bong-bing,6)}s')
         ########################################################################
         ## Plotting results, and saving if desired
         ########################################################################
@@ -171,12 +179,14 @@ for filename in files:
         fig = plt.figure(num=f'{filename}_true_vs_noise_xyz.pdf')
         axx = fig.add_subplot(projection='3d')
 
-        axx.scatter(xyz[0,::3], xyz[1,::3], xyz[2,::3], c='r', marker='o', label='True', alpha=1.0, s=0.1)
-        axx.scatter(gps_t[0,::3], gps_t[1,::3], gps_t[2,::3], c='b', marker='o', label='Wind + noise', alpha=0.3, s=0.1)
+        axx.scatter(xyz[0,::24], xyz[1,::24], xyz[2,::24], c='r', marker='o', label='True', alpha=0.83, s=0.5)
+        axx.scatter(gps_t[0,::15], gps_t[1,::15], gps_t[2,::15], c='b', marker='o', label='Wind + noise', alpha=0.4, s=0.5)
         plt.xlabel('x (m)', fontsize = 14)
         plt.ylabel('y (m)', fontsize = 14)
         axx.set_zlabel('z (m)', fontsize = 14)
-        plt.legend()
+        lgnd = plt.legend(scatterpoints=6, fontsize=10)
+        # lgnd.legendHandles[0]._sizes = [30]
+        # lgnd.legendHandles[1]._sizes = [30]
         plt.tight_layout()
         
         if save:
@@ -237,3 +247,5 @@ for filename in files:
             plt.show()
 
         plt.close('all')
+boom = time.time()
+print(f'Total time: {round(boom-bing,6)}s')
