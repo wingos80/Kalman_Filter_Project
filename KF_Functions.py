@@ -183,7 +183,7 @@ def kf_calc_f(t, X, U):
     sin_phi, cos_phi, sin_theta, cos_theta, sin_psi, cos_psi = np.sin(phi), np.cos(phi), np.sin(theta), np.cos(theta), np.sin(psi), np.cos(psi)
     tan_theta = np.tan(theta)
 
-    A = u*cos_theta + (v*sin_theta + w*cos_phi)*sin_theta  # saving some big terms to make expressions more readable
+    A = u*cos_theta + (v*sin_phi + w*cos_phi)*sin_theta  # saving some big terms to make expressions more readable
     B = (v*cos_phi - w*sin_phi)                                    # saving some big terms to make expressions more readable
 
     Xdot[0] = A*cos_psi - B*sin_psi + Wx

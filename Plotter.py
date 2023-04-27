@@ -57,8 +57,8 @@ def make_plots(x, ys, title, xlabel, ylabel, colors=None, save=False, log=None):
         Index of the plot to be plotted in log scale, by default None    
     """
     fig, ax = plt.subplots(len(ys), 1, sharex=True)
-    fig.canvas.manager.set_window_title('My Window Title') 
-    plt.subplots_adjust(top=0.965, bottom=0.110, right=0.990, left=0.145)
+    fig.canvas.manager.set_window_title(title) 
+    plt.subplots_adjust(top=0.965, bottom=0.110, right=0.990, left=0.165)
     if len(ylabel) != len(ys):
         print('---Plot Warning, Number of ylabel must be equal to number of plots')
             
@@ -75,7 +75,7 @@ def make_plots(x, ys, title, xlabel, ylabel, colors=None, save=False, log=None):
             plotter(ax[i], x, y, ylabel[i], colors=colors,log=None)
     
     if save:
-        plt.savefig(f'figs/{title.replace(" ", "_").replace("-", "_")}.pdf')
+        plt.savefig(f'{title.replace(" ", "_").replace("-", "_")}.pdf')
 
 # sns.set(style = "darkgrid")                  # Set seaborn style    
 
