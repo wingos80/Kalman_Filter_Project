@@ -1,12 +1,12 @@
 ########################################################################
 # Functions called by the Kalman Filter
 # 
-#   Author: Wing Chan, adapted from Coen de Visser
+#   Author: Wing Chan
 #   Email: wingyc80@gmail.com
-#   Date: 07-04-2023
+#   Date: 27-04-2023
 ########################################################################
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 def rk4(fn, xin, uin, t):
     """
@@ -76,23 +76,23 @@ def kf_finite_difference(dx, Ys, step_size=10):
     """
     # Initialize arrays to store derivatives
     first_derivative, second_derivative = np.zeros_like(Ys), np.zeros_like(Ys)
-    _ = np.zeros((Ys.shape[0],1))                                                     # useful array to prepend to the derivative arrays
-
+    
     # First derivative
-    temp = np.diff(Ys[:,::step_size], n=1, prepend=_)/(step_size*dx)                  # array containing the first derivatives
-    temp[:,0] = temp[:,3]
+    temp = (np.diff(Ys[:,:-step_size:step_size], n=1) + np.diff(Ys[:,step_size::step_size], n=1))/(2*step_size*dx)                  # array containing the first derivatives
+    temp = np.append(temp[:,0].reshape(Ys.shape[0],1), np.append(temp, temp[:,-1].reshape(Ys.shape[0],1), axis=1), axis=1)                                                # append the last column of the array to the end
     temp2 = np.arange(0, Ys.shape[1])
 
     # Interpolate the first derivative array to the original Ys array size
     for i, val in enumerate(Ys):
         first_derivative[i,:] = np.interp(temp2, temp2[::step_size], temp[i,:])
 
-    # Second derivative
-    temp = np.diff(first_derivative[:,::step_size], n=1, prepend=_)/(step_size*dx)    # array containing the second derivatives
-    temp[:,0] = temp[:,3]
-    temp2 = np.arange(0, Ys.shape[1])
+    # # Second derivative
+    temp = (np.diff(first_derivative[:,:-step_size:step_size], n=1) + np.diff(first_derivative[:,step_size::step_size], n=1))/(2*step_size*dx)                  # array containing the first derivatives
+    temp[:,0] = temp[:,1]
+    temp[:,-1] = temp[:,-2]
+    temp = np.append(temp[:,0].reshape(Ys.shape[0],1), np.append(temp, temp[:,-1].reshape(Ys.shape[0],1), axis=1), axis=1)                                                # append the last column of the array to the end
 
-    # Interpolate the second derivative array to the original Ys array size
+    # Interpolate the first derivative array to the original Ys array size
     for i, val in enumerate(Ys):
         second_derivative[i,:] = np.interp(temp2, temp2[::step_size], temp[i,:])
 
@@ -101,7 +101,8 @@ def kf_finite_difference(dx, Ys, step_size=10):
 
 def kf_calc_Fc(m, rho, S, Vs, accs):
     """
-    Calculates the control force coefficients Cx, Cy, Cz
+    Calculates the control force coefficients along the 3 body
+    axes x, y, and z: Cx, Cy, Cz
     Parameters
     ----------
     m : float
@@ -123,7 +124,8 @@ def kf_calc_Fc(m, rho, S, Vs, accs):
 
 def kf_calc_Mc(rho, b, c, S, I, Vs, rates, accs):
     """
-    Calculates the control moment coefficients Cm, Cl, Cn
+    Calculates the control moment coefficients along the 3 body
+    axes roll, pithc, and yaw: Cl, Cm, Cn
     Parameters
     ----------
     rho : float
@@ -476,3 +478,18 @@ def kf_calc_Hx(t, X, U):
 
     return DHx
         
+
+# dx = 0.1
+# X = np.arange(0,10,dx)
+# Y = np.array([X**3-10*X**2])
+
+# # calculate first and second derivatives of Y numerically using the numercal derivative function i wrote
+
+# first_derivative, second_derivative = kf_finite_difference(dx,Y,step_size=2)
+
+# plt.scatter(X,Y[0],label='Yss')
+# plt.plot(X,Y[0],label='Y')
+# plt.plot(X,first_derivative[0],label='Y\'')
+# plt.plot(X,second_derivative[0],label='Y\'\'')
+# plt.legend()
+# plt.show()

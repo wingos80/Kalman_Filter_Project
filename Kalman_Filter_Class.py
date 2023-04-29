@@ -257,7 +257,7 @@ class IEKF:
 
         # Updating the state estimate
         self.x_k1_k1 = self.eta2
-        self.x_k1_k1_dot = self.f(0, self.x_k1_k1, U_k) # for validation
+        self.x_k1_k1_dot = self.f(0, self.x_k1_k1, U_k) # for validation, im 
         
         # Making some local variables for readability
         K   = self.Kalman_Gain
