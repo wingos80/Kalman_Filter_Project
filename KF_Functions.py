@@ -320,6 +320,55 @@ def kf_calc_Fx(t, X, U):
     return DFx
         
 
+def kf_calc_Fu(t, X, U):
+    
+    n = X.size
+    nm = U.size
+    DFu = np.zeros([n, nm])
+    g = 9.80665                # gravitational acceleration [m/s^2]
+    
+    # saving the individual state and input names to make the code more readable
+    u, v, w, phi, theta = X[3], X[4], X[5], X[6], X[7]
+
+    #####################################################
+    ## Calculate Jacobian matrix of system dynamics
+    #####################################################
+
+    # saving the trig function values to make computations faster
+    sin_phi, cos_phi, cos_theta = np.sin(phi), np.cos(phi), np.cos(theta)
+    tan_theta = np.tan(theta)
+
+
+    # F1 derivatives
+    DFu[3,0] = 1
+    DFu[3,4] = -w
+    DFu[3,5] = v
+
+    # F2 derivatives
+    DFu[4,1] = 1
+    DFu[4,3] = w
+    DFu[4,5] = -u
+
+    # F3 derivatives
+    DFu[5,2] = 1
+    DFu[5,3] = -v
+    DFu[5,4] = u
+
+    # F4 derivatives
+    DFu[6,3] = 1
+    DFu[6,4] = sin_phi*tan_theta
+    DFu[6,5] = cos_phi*tan_theta
+
+    # F5 derivatives
+    DFu[7,4] = cos_phi
+    DFu[7,5] = -sin_phi
+
+    # F6 derivatives
+    DFu[8,4] = sin_phi/cos_theta
+    DFu[8,5] = cos_phi/cos_theta
+    return DFu
+        
+
 def kf_calc_h(t, X, U):
     """
     Calculates the system output equations h(x,u,t),
@@ -493,3 +542,13 @@ def kf_calc_Hx(t, X, U):
 # plt.plot(X,second_derivative[0],label='Y\'\'')
 # plt.legend()
 # plt.show()
+
+
+def c2d(Fx, dt, n_plus=0):
+    sum_term = np.zeros_like(Fx)
+    for n in range(15):
+        temp = np.eye(Fx.shape[0])
+        for i in range(n):
+            temp = temp@Fx
+        sum_term += temp*(dt**(n+n_plus))/np.math.factorial(n+n_plus)
+    return sum_term

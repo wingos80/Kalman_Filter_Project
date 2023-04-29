@@ -1,5 +1,6 @@
 import numpy as np
 import time, sys, os, control.matlab
+from KF_Functions import *
 
 class IEKF:
     """
@@ -44,7 +45,7 @@ class IEKF:
         self.dt      = dt               # time step
 
 
-    def setup_system(self, x_0, f, h, Fx, Hx, B, G, integrator):
+    def setup_system(self, x_0, f, h, Fx, Fu, Hx, B, G, integrator):
         """
         Set up the system dynamics, output equations, initial guess of system
         state.
@@ -79,7 +80,8 @@ class IEKF:
         # system dynamics and outputs
         self.f       = f                  # system dynamics
         self.h       = h                  # output equation
-        self.Fx      = Fx                 # Jacobian of system dynamics
+        self.Fx      = Fx                 # Jacobian of system dynamics wrt states
+        self.Fu      = Fu                 # Jacobian of system dynamics wrt inputs
         self.Hx      = Hx                 # Jacobian of output equation
 
         # saving the integation scheme chosen
@@ -166,20 +168,17 @@ class IEKF:
         self.G = G
 
         # Calc Jacobians, Phi(k+1, k), and Gamma(k+1, k)
-        F_jacobian  = self.Fx(0, self.x_k1_k, U_k)
-        ss_B        = control.matlab.ss(F_jacobian, self.B, np.zeros((self.nm, self.n)), np.zeros((self.nm, self.m)))  # state space model with A and B matrices, to identify phi and psi matrices
-        ss_G        = control.matlab.ss(F_jacobian, self.G, np.zeros((self.nm, self.n)), np.zeros((self.nm, self.G.shape[1])))  # state space model with A and G matrices, to identify phi and gamma matrices
-        
+        Fx_jacobian  = self.Fx(0, self.x_k1_k, U_k)
+        Fu_jacobian  = self.Fu(0, self.x_k1_k, U_k)
 
-        # Continuous to discrete time transformation of state space matrices
-        Psi         = control.matlab.c2d(ss_B, self.dt).B   # discretized B matrix
-        Phi         = control.matlab.c2d(ss_G, self.dt).A   # discretized A matrix
-        Gamma       = control.matlab.c2d(ss_G, self.dt).B   # discretized G matrix
+        # discretizing the state transition and input matrices according to how C.C. de Visser does it in his PhD thesis
+        Phi = c2d(Fx_jacobian, self.dt)                      
+        Gamma = c2d(Fx_jacobian, self.dt, n_plus=1)@Fu_jacobian
 
         # P(k+1|k) (prediction covariance matrix)
         self.P_k1_k = Phi@self.P_k1_k1@Phi.transpose() + Gamma@self.Q@Gamma.transpose()
         self.eta2   = self.x_k1_k
-        self.F_jacobian = F_jacobian
+        self.F_jacobian = Fx_jacobian
 
 
     def check_obs_rank(self, Hx, Fx):
@@ -227,21 +226,20 @@ class IEKF:
                 print('\n\n\n\n**********************WARNING**********************\n\n')
                 print(f'The current states are not observable; rank of Observability Matrix is {rankHF}, should be {self.n}\n')
 
-        # Observation and observation error predictions
-        self.z_k1_k = self.h(0, eta1, U_k)                                     # prediction of observation (for validation)   
-        P_zz        = H_jacobian@self.P_k1_k@H_jacobian.transpose() + self.R   # covariance matrix of observation error (for validation)   
-        self.std_z  = np.sqrt(P_zz.diagonal())                                 # standard deviation of observation error (for validation)    
+        residual = Z_k.reshape(self.nm,1) - self.h(0, eta1, U_k)
+        res_covariance = H_jacobian@self.P_k1_k@H_jacobian.T + self.R
+        self.std_z  = np.sqrt(res_covariance.diagonal())                        # standard deviation of observation error (for validation)
 
-        # K(k+1) (gain), Kalman Gain
-        Kalman_Gain             = self.P_k1_k@H_jacobian.transpose()@np.linalg.inv(P_zz)
-    
-        # New observation and state estimate
-        temp             = np.reshape(Z_k, (self.nm,1))                        # Need to reshape this Z array to a column vector
-        eta2             = self.x_k1_k + Kalman_Gain@(temp - self.z_k1_k - H_jacobian@(self.x_k1_k - eta1))
-        self.err         = np.linalg.norm(eta2-eta1)/np.linalg.norm(eta1)       # difference in updated state estimate and previous state estimate
+        Kalman_Gain = self.P_k1_k@H_jacobian.T@np.linalg.inv(res_covariance)
+
+        eta2 = self.x_k1_k + Kalman_Gain@(residual - H_jacobian@(self.x_k1_k - eta1))
+        self.err         = np.linsalg.norm(eta2-eta1)/np.linalg.norm(eta1)       # difference in updated state estimate and previous state estimate
+        
         self.H_jacobian  = H_jacobian
         self.Kalman_Gain = Kalman_Gain
-        self.eta2        = eta2
+        self.eta2 = eta2
+        self.residual = residual
+        self.z_k1_k = self.h(0, eta1, U_k) 
 
 
     def update(self, U_k, k):
@@ -268,7 +266,7 @@ class IEKF:
         self.std_x_cor   = np.sqrt(P_k1_k1.diagonal())        # standard deviation of state estimation error (for validation)
 
         # calculate the kalman filter 'innovation', difference in measured and predicted observation
-        innovation = np.linalg.norm(self.z_k1_k - self.h(0, self.x_k1_k1, U_k))
+        innovation = np.linalg.norm(self.residual)
 
         # Store results, need to flatten the arrays to store in a matrix
         self.P_k1_k1     = P_k1_k1

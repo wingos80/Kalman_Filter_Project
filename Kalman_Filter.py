@@ -22,7 +22,7 @@ sns.set(style = "darkgrid")                  # Set seaborn style
 ## Start writing measurements to csv files
 ########################################################################
 save      = True             # enable saving data
-show_plot = False            # enable plotting
+show_plot = True            # enable plotting
 printfigs = True             # enable saving figures
 
 all_results_file = open("data/all_results.csv", "w")
@@ -34,6 +34,7 @@ files = os.listdir(os.getcwd())
 os.chdir("../..")
 
 time1 = time.time()
+files = ['dedoublet_1_measurements.csv']
 for filename in files:
     print(f"\n\nFiltering data for {filename}...\n\n")
     ########################################################################
@@ -70,8 +71,8 @@ for filename in files:
     ########################################################################
     E_x_0       = np.zeros([18,1])                                                                            # initial estimate of x_k1_k1
     E_x_0[3:9]  = Z[3:9, 0].reshape(6,1)                                                                      # initial estimate of velocity and flight angles
-    E_x_0[9:12] = np.array([[20], [-80], [10]])                                                                  # initial estimate of Wind velocities
-    E_x_0[12:]  = np.array([[0.2], [0.2], [0.2], [0.03*np.pi/180], [0.03*np.pi/180], [0.03*np.pi/180]]) # initial estimate of lambda (biases), angular biases in radians
+    E_x_0[9:12] = np.array([[2], [-8], [1]])                                                                  # initial estimate of Wind velocities
+    E_x_0[12:]  = np.array([[0.02], [0.02], [0.02], [0.003*np.pi/180], [0.003*np.pi/180], [0.003*np.pi/180]]) # initial estimate of lambda (biases), angular biases in radians
     B           = np.zeros([18,6])                                                                            # input matrix
 
     # Initial state standard deviation estimates
@@ -120,7 +121,7 @@ for filename in files:
     kalman_filter = IEKF(N=num_samples, nm=nm, dt=dt, epsilon=epsilon, maxIterations=maxIterations)
 
     # Set up the system in the Kalman filter
-    kalman_filter.setup_system(x_0=E_x_0, f=kf_calc_f, h=kf_calc_h, Fx=kf_calc_Fx, Hx=kf_calc_Hx, B=B, G=G, integrator=rk4)
+    kalman_filter.setup_system(x_0=E_x_0, f=kf_calc_f, h=kf_calc_h, Fx=kf_calc_Fx, Fu=kf_calc_Fu, Hx=kf_calc_Hx, B=B, G=G, integrator=rk4)
 
     # Set up the noise in the Kalman filter
     kalman_filter.setup_covariances(P_stds=P_stds, Q_stds=Q_stds, R_stds=R_stds)
@@ -135,7 +136,10 @@ for filename in files:
         bing = time.time()
         
         # Picking out the k-th entry in the input and measurement vectors
-        U_k = U[:,k]
+        if k == num_samples-1:
+            U_k = U[:,k]
+        else:
+            U_k = (U[:,k] + U[:,k+1])/2
         Z_k = Z[:,k]
 
         # Predict and discretize the system
@@ -162,7 +166,7 @@ for filename in files:
     result_filename = filename.replace('measurements', 'filtered')
 
     if save:
-        result_file = open('data/filtered/d/' + result_filename, "w")
+        result_file = open('data/filtered/test/' + result_filename, "w")
 
         # writing the column headings in the results file
         result_file.write(f"x_kf, y_kf, z_kf, u_kf, v_kf, w_kf, phi_kf, theta_kf, psi_kf, Wx_kf, Wy_kf, Wz_kf, Lx_kf, Ly_kf, Lz_kf, Lp_kf, Lq_kf, Lr_kf, da, de, dr, Tc1, Tc2, V, alpha, beta\n")
@@ -178,7 +182,7 @@ for filename in files:
     ## Plotting all the filtered data and the kalman estimated values
     ########################################################################
     
-    figs_destination = 'figs/filtered_figs/d/' + filename.split('_m')[0]
+    figs_destination = 'figs/filtered_figs/test/' + filename.split('_m')[0]
 
     # Saving the kalman filtered predictions
     Winds              = Xs[9:12]                             # Predicted alpha from KF
