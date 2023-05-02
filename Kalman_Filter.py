@@ -22,19 +22,19 @@ sns.set(style = "darkgrid")                  # Set seaborn style
 ## Start writing measurements to csv files
 ########################################################################
 save      = True             # enable saving data
-show_plot = True            # enable plotting
+show_plot = False            # enable plotting
 printfigs = True             # enable saving figures
 
 all_results_file = open("data/all_results.csv", "w")
 all_results_file.write(f"x_kf, y_kf, z_kf, u_kf, v_kf, w_kf, phi_kf, theta_kf, psi_kf, Wx_kf, Wy_kf, Wz_kf, Lx_kf, Ly_kf, Lz_kf, Lp_kf, Lq_kf, Lr_kf, da, de, dr, Tc1, Tc2, V, alpha, beta\n")
 
 # Change the current working directory to the data folder and process all original csv files
-os.chdir("data/regenerated/")
+os.chdir("data/regenerated/noise/")
 files = os.listdir(os.getcwd())
-os.chdir("../..")
+os.chdir("../../..")
 
 time1 = time.time()
-files = ['dedoublet_1_measurements.csv']
+# files = ['de3211_1_measurements.csv']
 for filename in files:
     print(f"\n\nFiltering data for {filename}...\n\n")
     ########################################################################
@@ -42,7 +42,7 @@ for filename in files:
     ########################################################################
 
     # filename = 'data/de3211_1_measurements.csv'
-    train_data = genfromtxt('data/regenerated/'+filename, delimiter=',').T
+    train_data = genfromtxt('data/regenerated/noise/' + filename, delimiter=',').T
     train_data = train_data[:, 1:]
 
     xyz        = train_data[0:3]                   # First 3 columns are the simulated xyz's 
@@ -50,6 +50,9 @@ for filename in files:
     U          = train_data[15:21]                 # These are the IMU measurements
     CTRLs      = train_data[21:]                   # These are the control inputs
 
+    vtas = train_data[-3]
+    alphas = train_data[-2]
+    betas = train_data[-1]
     ########################################################################
     ## Set simulation parameters
     ########################################################################
@@ -59,8 +62,8 @@ for filename in files:
     m               = 6                          # input dimension (not used)
     dt              = 0.01                       # time step [s]
     num_samples     = len(U[0])                  # number of samples
-    epsilon         = 10**(-12)                  # IEKF threshold
-    maxIterations   = 500                        # maximum amount of iterations per sample
+    epsilon         = 10**(-19)                  # IEKF threshold
+    maxIterations   = 600                        # maximum amount of iterations per sample
 
     ########################################################################
     ## Set initial values for states and statistics
@@ -76,7 +79,8 @@ for filename in files:
     B           = np.zeros([18,6])                                                                            # input matrix
 
     # Initial state standard deviation estimates
-    P_stds  = [1, 1, 1, 5, 5, 5, 0.01, 0.01, 0.01, 2, 8, 1, 0.002, 0.002, 0.002, 0.0003*np.pi/180, 0.0003*np.pi/180, 0.0003*np.pi/180]
+    P_stds  = [0.1, 0.1, 0.1, 0.5, 0.5, 0.5, 0.01, 0.01, 0.01, 2, 8, 1, 0.002, 0.002, 0.002, 0.0003*np.pi/180, 0.0003*np.pi/180, 0.0003*np.pi/180]
+    
     
     # System noises, all noise are white (unbiased and uncorrelated in time)
     std_b_x = 0.02                                  # standard deviation of accelerometer x measurement noise
@@ -136,10 +140,11 @@ for filename in files:
         bing = time.time()
         
         # Picking out the k-th entry in the input and measurement vectors
-        if k == num_samples-1:
-            U_k = U[:,k]
-        else:
-            U_k = (U[:,k] + U[:,k+1])/2
+        # if k == num_samples-1:
+        #     U_k = U[:,k]
+        # else:
+        #     U_k = (U[:,k] + U[:,k+1])/2
+        U_k = U[:,k]
         Z_k = Z[:,k]
 
         # Predict and discretize the system
@@ -166,7 +171,7 @@ for filename in files:
     result_filename = filename.replace('measurements', 'filtered')
 
     if save:
-        result_file = open('data/filtered/test/' + result_filename, "w")
+        result_file = open('data/filtered/normal/' + result_filename, "w")
 
         # writing the column headings in the results file
         result_file.write(f"x_kf, y_kf, z_kf, u_kf, v_kf, w_kf, phi_kf, theta_kf, psi_kf, Wx_kf, Wy_kf, Wz_kf, Lx_kf, Ly_kf, Lz_kf, Lp_kf, Lq_kf, Lr_kf, da, de, dr, Tc1, Tc2, V, alpha, beta\n")
@@ -182,7 +187,7 @@ for filename in files:
     ## Plotting all the filtered data and the kalman estimated values
     ########################################################################
     
-    figs_destination = 'figs/filtered_figs/test/' + filename.split('_m')[0]
+    figs_destination = 'figs/filtered_figs/normal/' + filename.split('_m')[0]
 
     # Saving the kalman filtered predictions
     Winds              = Xs[9:12]                             # Predicted alpha from KF
@@ -210,13 +215,31 @@ for filename in files:
         print(f"\n***************************************\nSaving figures to location: {figs_destination}\n***************************************\n")
         plt.savefig(f'{figs_destination}_xyz.pdf')
 
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    # ax.scatter(Z[9,::25], Z[10,::25], Z[11,::25], label='regenerated', alpha=0.3)
+    print(Zs[11])
+    ax.scatter(Zs[9,::15], Zs[10,::15], Zs[11,::15], label='predicted')
+    ax.scatter(vtas[::10], alphas[::10], betas[::10], label='true', alpha=0.3)
+    ax.set_xlabel('v [m/s]')
+    ax.set_ylabel('alpha [rad]')
+    ax.set_zlabel('beta [rad]')
+    # ax.set_zlim(-0.0006, 0.0006)
+    ax.legend()
+    if printfigs:
+        print(f"\n***************************************\nSaving figures to location: {figs_destination}\n***************************************\n")
+        plt.savefig(f'{figs_destination}_vtas_alpha_beta.pdf')
+
+    # plt.show()
     x      = dt*np.arange(0, num_samples, 1)
 
-    ys = {'u body': [Xs[3], 0.9],
-            'v body': [Xs[4], 0.9],
-            'w body': [Xs[5], 0.9]}
-    
-    make_plots(x, [ys], f'{figs_destination} estimated body velocities', r'Time $[s]$', [r'body velocities $[m/s]$'], save=printfigs, colors=colors)
+    ys     = {r'raw u': [Z[3], 0.3],
+            r'raw v': [Z[4], 0.3],
+            r'raw w': [Z[5], 0.3],
+            r'kf u':  [Zs[3], 1.0],
+            r'kf v':  [Zs[4], 1.0],
+            r'kf w':  [Zs[5], 1.0],}
+    make_plots(x, [ys], f'{figs_destination} raw and kalman-filtered navigation velocities', r'Time $[s]$', [r'body velocities $[m/s]$'], save=printfigs, colors=colors)
 
     ys = {r'raw x': [Z[0], 0.3],
         r'raw y': [Z[1], 0.3],
@@ -229,16 +252,13 @@ for filename in files:
         r'$\sigma^2(z)$': [kalman_filter.PP_k1_k1[2], 1.0]}
     make_plots(x, [ys, ys2], f'{figs_destination} raw and kalman-filtered positions', r'Time $[s]$', [r'$x [m]$', r'$x^2 [m^2]$'], colors=colors, save=printfigs, log=1)
 
-    ys     = {r'raw u': [Z[3], 0.3],
-            r'raw v': [Z[4], 0.3],
-            r'raw w': [Z[5], 0.3],
-            r'kf u':  [Zs[3], 1.0],
-            r'kf v':  [Zs[4], 1.0],
-            r'kf w':  [Zs[5], 1.0],}
+    ys     = {r'body u':  [Xs[3], 1.0],
+            r'body v':  [Xs[4], 1.0],
+            r'body w':  [Xs[5], 1.0],}
     ys2 = {r'$\sigma^2(u)$': [kalman_filter.PP_k1_k1[3], 1.0],
         r'$\sigma^2(v)$': [kalman_filter.PP_k1_k1[4], 1.0],
         r'$\sigma^2(w)$': [kalman_filter.PP_k1_k1[5], 1.0]}
-    make_plots(x, [ys, ys2], f'{figs_destination} raw and kalman-filtered velocities', r'Time $[s]$', [r'$u [m/s]$', r'$u^2 [m^2/s^2]$'], colors=colors, save=printfigs, log=1)
+    make_plots(x, [ys, ys2], f'{figs_destination} estimated body velocities', r'Time $[s]$', [r'$u [m/s]$', r'$u^2 [m^2/s^2]$'], colors=colors, save=printfigs, log=1)
 
     ys      = {r'raw $\phi$':   [Z[6], 0.3],
             r'raw $\theta$': [Z[7], 0.3],

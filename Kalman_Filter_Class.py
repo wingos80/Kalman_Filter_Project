@@ -165,15 +165,18 @@ class IEKF:
                                 [-1, -np.sin(phi) * np.tan(theta), -np.cos(phi) * np.tan(theta)], 
                                 [0, -np.cos(phi), np.sin(phi)], 
                                 [0, -np.sin(phi) / np.cos(theta), -np.cos(phi) / np.cos(theta)]], dtype=object)  # rate gyro noise
-        self.G = G
 
         # Calc Jacobians, Phi(k+1, k), and Gamma(k+1, k)
         Fx_jacobian  = self.Fx(0, self.x_k1_k, U_k)
         Fu_jacobian  = self.Fu(0, self.x_k1_k, U_k)
 
         # discretizing the state transition and input matrices according to how C.C. de Visser does it in his PhD thesis
-        Phi = c2d(Fx_jacobian, self.dt)                      
+        Phi = c2d(Fx_jacobian, self.dt)
         Gamma = c2d(Fx_jacobian, self.dt, n_plus=1)@Fu_jacobian
+
+        # ss_G        = control.matlab.ss(Fx_jacobian, G, np.zeros((self.nm, self.n)), np.zeros((self.nm, G.shape[1])))  # state space model with A and G matrices, to identify phi and gamma matrices
+        # Phi         = control.matlab.c2d(ss_G, self.dt).A
+        # Gamma       = control.matlab.c2d(ss_G, self.dt).B
 
         # P(k+1|k) (prediction covariance matrix)
         self.P_k1_k = Phi@self.P_k1_k1@Phi.transpose() + Gamma@self.Q@Gamma.transpose()
@@ -216,26 +219,28 @@ class IEKF:
         self.itr +=1
         eta1 = self.eta2
         # Construct the Jacobian H = d/dx(h(x))) with h(x) the observation model transition matrix 
-        H_jacobian  = self.Hx(0, eta1, U_k)
+        H_j  = self.Hx(0, eta1, U_k)
         
         # Check observability of state
         if (k == 0 and self.itr == 1):
             F_jacobian  = self.F_jacobian
-            rankHF  = self.check_obs_rank(H_jacobian, F_jacobian);
+            rankHF  = self.check_obs_rank(H_j, F_jacobian);
             if (rankHF < self.n):
                 print('\n\n\n\n**********************WARNING**********************\n\n')
                 print(f'The current states are not observable; rank of Observability Matrix is {rankHF}, should be {self.n}\n')
 
         residual = Z_k.reshape(self.nm,1) - self.h(0, eta1, U_k)
-        res_covariance = H_jacobian@self.P_k1_k@H_jacobian.T + self.R
+
+        # Calculate the Kalman Gain
+        res_covariance = H_j@self.P_k1_k@H_j.T + self.R
         self.std_z  = np.sqrt(res_covariance.diagonal())                        # standard deviation of observation error (for validation)
+        Kalman_Gain = self.P_k1_k@H_j.T@np.linalg.inv(res_covariance)
 
-        Kalman_Gain = self.P_k1_k@H_jacobian.T@np.linalg.inv(res_covariance)
-
-        eta2 = self.x_k1_k + Kalman_Gain@(residual - H_jacobian@(self.x_k1_k - eta1))
-        self.err         = np.linsalg.norm(eta2-eta1)/np.linalg.norm(eta1)       # difference in updated state estimate and previous state estimate
+        # Update the state estimation
+        eta2 = self.x_k1_k + Kalman_Gain@(residual - H_j@(self.x_k1_k - eta1))
+        self.err         = np.linalg.norm(eta2-eta1)/np.linalg.norm(eta1)       # difference in updated state estimate and previous state estimate
         
-        self.H_jacobian  = H_jacobian
+        self.H_jacobian  = H_j
         self.Kalman_Gain = Kalman_Gain
         self.eta2 = eta2
         self.residual = residual
@@ -262,15 +267,14 @@ class IEKF:
         H_j = self.H_jacobian
 
         # P(k|k) (correction) using the numerically stable form of P_k_1k_1 = (eye(n) - K*Hx) * P_kk_1 
-        P_k1_k1          = (self.eye_n - K@H_j)@self.P_k1_k@(self.eye_n - K@H_j).transpose() + K@self.R@K.transpose()    
-        self.std_x_cor   = np.sqrt(P_k1_k1.diagonal())        # standard deviation of state estimation error (for validation)
+        self.P_k1_k1 = (self.eye_n - K@H_j)@self.P_k1_k
+        # self.P_k1_k1          = (self.eye_n - K@H_j)@self.P_k1_k@(self.eye_n - K@H_j).transpose() + K@self.R@K.transpose()    
+        self.std_x_cor   = np.sqrt(self.P_k1_k1.diagonal())        # standard deviation of state estimation error (for validation)
 
         # calculate the kalman filter 'innovation', difference in measured and predicted observation
         innovation = np.linalg.norm(self.residual)
 
         # Store results, need to flatten the arrays to store in a matrix
-        self.P_k1_k1     = P_k1_k1
-
         self.ZZ_pred[:,k]    = self.z_k1_k.flatten()              # predicted observation
         self.XX_k1_k1[:,k]   = self.x_k1_k1.flatten()             # estimated state
         self.PP_k1_k1[:,k]   = self.P_k1_k1.diagonal().flatten()  # estimated state covariance (for validation)

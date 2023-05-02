@@ -34,6 +34,7 @@ files = os.listdir(os.getcwd())
 os.chdir("../..")
 
 bing = time.time()
+# files = ['de3211_1.csv']
 for filename in files:
     ########################################################################
     ## Data I/O managing
@@ -66,14 +67,7 @@ for filename in files:
     u_n        = train_data[25]    # velocities are in the local earth frame (north, East, Down frame!!)
     v_n        = train_data[26]    # velocities are in the local earth frame (north, East, Down frame!!)
     w_n        = train_data[27]    # velocities are in the local earth frame (north, East, Down frame!!)
-
-    if save:
-        result_filename = 'data/regenerated/' + filename.replace('.csv','_measurements.csv')
-        result_file  = open(result_filename, "w")
-
-        # writing the column headings in the resulte file, ADS stands for airdata sensors
-        result_file.write(f"XYZ_x, XYZ_y, XYZ_z, GPS_x, GPS_y, GPS_z, GPS_u, GPS_v, GPS_w, GPS_phi, GPS_theta, GPS_psi, ADS_vel, ADS_alpha, ADS_beta, IMU_Ax, IMU_Ay, IMU_Az, IMU_p, IMU_q, IMU_r, CTRL_da, CTRL_de, CTRL_dr, CTRL_Tc1, CTRL_Tc2, time\n")
-
+    
     ########################################################################
     ## Setting the parameters for generating the "real" data
     ########################################################################
@@ -119,12 +113,6 @@ for filename in files:
     noise_imu = np.random.normal(np.zeros((6,1)), stds_imu, (6, len(times)))
 
     Wx, Wy, Wz = 2, -8, 1
-
-    #  Adding wind velocities to the 3 velocity components
-    u_n = u_n + Wx
-    v_n = v_n + Wy
-    w_n = w_n + Wz
-
     ########################################################################
     ## Set up the simulation variables
     ########################################################################
@@ -134,15 +122,50 @@ for filename in files:
     airdata_t      = np.zeros([3, len(times)])       # Vtas, alpha, beta
     imu_t          = np.zeros([6, len(times)])       # Ax, Ay, Az, p, q, r
 
-    # Storing the GPS and airdata measurements that are already known from the csv filess
-    gps_t[3:,:]    += np.array([u_n, v_n, w_n, phi, theta, psi]) + noise_gps[3:,:]
-    gps_t[:3,:]    += noise_gps[:3,:]
-    airdata_t[:,:] += np.array([vtas, alpha, beta]) + noise_ads[:,:]
-    imu_t[:,:]     += np.array([ax, ay, az, p, q, r]) + lambda_imu + noise_imu[:,:]
+    # # Storing the GPS and airdata measurements that are already known from the csv filess
+    # gps_t[3:,:]    += np.array([u_n, v_n, w_n, phi, theta, psi]) + noise_gps[3:,:]
+    # gps_t[:3,:]    += noise_gps[:3,:]
+    # airdata_t[:,:] += np.array([vtas, alpha, beta]) + noise_ads[:,:]
+    # imu_t[:,:]     += np.array([ax, ay, az, p, q, r]) + lambda_imu + noise_imu[:,:]
 
+    # #  Adding wind velocities to the 3 velocity components
+    # u_n = u_n + Wx
+    # v_n = v_n + Wy
+    # w_n = w_n + Wz
+
+
+    # Storing the GPS and airdata measurements that are already known from the csv filess
+    gps_t[3:,:]    += np.array([u_n, v_n, w_n, phi, theta, psi])
+    airdata_t[:,:] += np.array([vtas, alpha, beta])
+    imu_t[:,:]     += np.array([ax, ay, az, p, q, r])
+
+    #  Adding wind velocities to the 3 velocity components
+    u_n = u_n
+    v_n = v_n
+    w_n = w_n
+
+    # # Use 3D scatter plot to visualize the alpha beta vtas
+    # fig = plt.figure(num=f'vtas alpha beta')
+    # axx = fig.add_subplot(projection='3d')
+
+    # axx.scatter(vtas, alpha, beta, c=times, cmap='viridis', linewidth=0.5)
+    # axx.scatter(airdata_t[0,::5], airdata_t[1,::5], airdata_t[2,::5], c=times[::5], cmap='viridis', linewidth=0.5, alpha=0.2)
+    # axx.set_xlabel('vtas')
+    # axx.set_ylabel('alpha')
+    # axx.set_zlabel('beta')
+    # axx.set_title('vtas alpha beta')
+    # axx.set_zlim(-0.001, 0.0015)
+    # plt.show()
+    
     if save:
+        result_filename = 'data/regenerated/no_noise/' + filename.replace('.csv','_measurements.csv')
+        result_file     = open(result_filename, "w")
+
+        # writing the column headings in the resulte file, ADS stands for airdata sensors
+        result_file.write(f"XYZ_x, XYZ_y, XYZ_z, GPS_x, GPS_y, GPS_z, GPS_u, GPS_v, GPS_w, GPS_phi, GPS_theta, GPS_psi, ADS_vel, ADS_alpha, ADS_beta, IMU_Ax, IMU_Ay, IMU_Az, IMU_p, IMU_q, IMU_r, CTRL_da, CTRL_de, CTRL_dr, CTRL_Tc1, CTRL_Tc2, time, Vtas, alpha, beta\n")
+
         # Storing the initial measurements
-        result_file.write(f"{xyz[0,0]}, {xyz[1,0]}, {xyz[2,0]}, {gps_t[0,0]}, {gps_t[1,0]}, {gps_t[2,0]}, {gps_t[3,0]}, {gps_t[4,0]}, {gps_t[5,0]}, {gps_t[6,0]}, {gps_t[7,0]}, {gps_t[8,0]}, {airdata_t[0,0]}, {airdata_t[1,0]}, {airdata_t[2,0]}, {imu_t[0,0]}, {imu_t[1,0]}, {imu_t[2,0]}, {imu_t[3,0]}, {imu_t[4,0]}, {imu_t[5,0]}, {da[0]}, {de[0]}, {dr[0]}, {tc1[0]}, {tc2[0]}, {times[0]}\n")
+        result_file.write(f"{xyz[0,0]}, {xyz[1,0]}, {xyz[2,0]}, {gps_t[0,0]}, {gps_t[1,0]}, {gps_t[2,0]}, {gps_t[3,0]}, {gps_t[4,0]}, {gps_t[5,0]}, {gps_t[6,0]}, {gps_t[7,0]}, {gps_t[8,0]}, {airdata_t[0,0]}, {airdata_t[1,0]}, {airdata_t[2,0]}, {imu_t[0,0]}, {imu_t[1,0]}, {imu_t[2,0]}, {imu_t[3,0]}, {imu_t[4,0]}, {imu_t[5,0]}, {da[0]}, {de[0]}, {dr[0]}, {tc1[0]}, {tc2[0]}, {times[0]}, {vtas[0]}, {alpha[0]}, {beta[0]}\n")
 
     # Running numerical integration to recreate the flight positions
     for k in range(len(times)-1):
@@ -157,7 +180,7 @@ for filename in files:
         
         if save:
             # Storing the measurements at each time step if desired
-            result_file.write(f"{xyz[0,k+1]}, {xyz[1,k+1]}, {xyz[2,k+1]}, {gps_t[0,k+1]}, {gps_t[1,k+1]}, {gps_t[2,k+1]}, {gps_t[3,k+1]}, {gps_t[4,k+1]}, {gps_t[5,k+1]}, {gps_t[6,k+1]}, {gps_t[7,k+1]}, {gps_t[8,k+1]}, {airdata_t[0,k+1]}, {airdata_t[1,k+1]}, {airdata_t[2,k+1]}, {imu_t[0,k+1]}, {imu_t[1,k+1]}, {imu_t[2,k+1]}, {imu_t[3,k+1]}, {imu_t[4,k+1]}, {imu_t[5,k+1]}, {da[k+1]}, {de[k+1]}, {dr[k+1]}, {tc1[k+1]}, {tc2[k+1]}, {times[k+1]}\n")       
+            result_file.write(f"{xyz[0,k+1]}, {xyz[1,k+1]}, {xyz[2,k+1]}, {gps_t[0,k+1]}, {gps_t[1,k+1]}, {gps_t[2,k+1]}, {gps_t[3,k+1]}, {gps_t[4,k+1]}, {gps_t[5,k+1]}, {gps_t[6,k+1]}, {gps_t[7,k+1]}, {gps_t[8,k+1]}, {airdata_t[0,k+1]}, {airdata_t[1,k+1]}, {airdata_t[2,k+1]}, {imu_t[0,k+1]}, {imu_t[1,k+1]}, {imu_t[2,k+1]}, {imu_t[3,k+1]}, {imu_t[4,k+1]}, {imu_t[5,k+1]}, {da[k+1]}, {de[k+1]}, {dr[k+1]}, {tc1[k+1]}, {tc2[k+1]}, {times[k+1]}, {vtas[k+1]}, {alpha[k+1]}, {beta[k+1]}\n")       
             
     bong = time.time()
     print(f'Elapsed time: {round(bong-bing,6)}s')

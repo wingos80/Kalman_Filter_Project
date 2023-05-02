@@ -546,7 +546,7 @@ def kf_calc_Hx(t, X, U):
 
 def c2d(Fx, dt, n_plus=0):
     sum_term = np.zeros_like(Fx)
-    for n in range(15):
+    for n in range(10):
         temp = np.eye(Fx.shape[0])
         for i in range(n):
             temp = temp@Fx

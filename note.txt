@@ -1,0 +1,7 @@
+identify Cx eq: use da3211_2, de3211_1
+identify Cy eq: use dadoublet_1, da3211_2, dr3211_1, dr3211_2
+identify Cz eq: use de3211_1, dedoublet_1 (maybe dadoublet_1, da3211_2)
+
+identify Cl eq: use da3211_2, dadoublet_1 (maybe dr3211_1, dr3211_2)
+identify Cm eq: use de3211_1, dedoublet_1 (maybe dr3211_1, dr3211_2)
+identify Cn eq: use dr3211_1, dr3211_2

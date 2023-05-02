@@ -39,7 +39,12 @@ betas  = None
 os.chdir("data/filtered/a/")
 files = os.listdir(os.getcwd())
 os.chdir("../../..")
+files = ['de3211_1_filtered.csv']
 
+
+save      = True             # enable saving data
+show_plot = True            # enable plotting
+printfigs = True             # enable saving figures
 for filename in files:
     print(f"\n\nProcessing data for {filename}...\n\n")
 
@@ -73,13 +78,14 @@ for filename in files:
 
     # Calculate the biases
     Bias = Biases[:,-25:].mean(axis=1)
+    
     ########################################################################
     ## Finding the force and moment derivative coefficients
     ########################################################################
 
     Vs_k     = np.sqrt(Xs_k[3,:]**2 + Xs_k[4,:]**2 + Xs_k[5,:]**2)              # calculating the airspeed from the velocities
-    alphas_k = np.arctan2(Xs_k[5,:], Xs_k[3,:])                             # calculating the angle of attack from the velocities
-    betas_k  = np.arctan2(Xs_k[4,:], np.sqrt(Xs_k[3,:]**2 + Xs_k[5,:]**2))                                     # calculating the sideslip angle from the velocities
+    alphas_k = np.arctan2(Xs_k[5,:], Xs_k[3,:])                                 # calculating the angle of attack from the velocities
+    betas_k  = np.arctan2(Xs_k[4,:], np.sqrt(Xs_k[3,:]**2 + Xs_k[5,:]**2))      # calculating the sideslip angle from the velocities
 
     # finding the aircraft angular accelerations by calculating the second derivatives of the angles using finite difference
     ang_rate_dots_X, ang_accel_dots_X = kf_finite_difference(dt, Xs_k[6:9])           # finding derivative of the flight angles
@@ -94,23 +100,23 @@ for filename in files:
     ys = {r'$\dot{p}$': [ang_accel_dots_X[0,:], 0.8],
           r'$\dot{q}$': [ang_accel_dots_X[1,:], 0.8],
           r'$\dot{r}$': [ang_accel_dots_X[2,:], 0.8]}
-    make_plots(x, [ys], f"figs/models/{filename} Angular Accelerations", "Time [s]", [r"Angular Accelerations $[rad/s^2]$"],save=True)
+    make_plots(x, [ys], f"figs/models/{filename} Angular Accelerations", "Time [s]", [r"Angular Accelerations $[rad/s^2]$"],save=printfigs)
     ys = {r'$A_x$': [vel_rate_dots_X[0,:], 0.8],
           r'$A_y$': [vel_rate_dots_X[1,:], 0.8],
           r'$A_z$': [vel_rate_dots_X[2,:], 0.8]}
     ys2 = {'vx': [Xs_k[3,:], 0.8],
           'vy': [Xs_k[4,:], 0.8],
           'vz': [Xs_k[5,:], 0.8]}
-    make_plots(x, [ys, ys2], f"figs/models/{filename} Accelerations and velocities", "Time [s]", [r"Acceleration $[m/s^2]$",r"Flight Velocity $[m/s]$"],save=True)
+    make_plots(x, [ys, ys2], f"figs/models/{filename} Accelerations and velocities", "Time [s]", [r"Acceleration $[m/s^2]$",r"Flight Velocity $[m/s]$"],save=printfigs)
     ys = {'phi': [Xs_k[6,:], 0.8],
           'theta': [Xs_k[7,:], 0.8],
           'psi': [Xs_k[8,:], 0.8]}
-    make_plots(x, [ys], f"figs/models/{filename} Flight Angles", "Time [s]", [r"Flight Angle $[rad]$"],save=True)
+    make_plots(x, [ys], f"figs/models/{filename} Flight Angles", "Time [s]", [r"Flight Angle $[rad]$"],save=printfigs)
     ys = {'Vtas': [Vs_k, 0.8]}
-    make_plots(x, [ys], f"figs/models/{filename} Airspeed", "Time [s]", [r"Airspeed $[m/s]$"],save=True)
+    make_plots(x, [ys], f"figs/models/{filename} Airspeed", "Time [s]", [r"Airspeed $[m/s]$"],save=printfigs)
     ys = {'alpha': [alphas_k, 0.8],
           'beta': [betas_k, 0.8]}
-    make_plots(x, [ys], f"figs/models/{filename} Alpha and Beta", "Time [s]", [r"Angle$[rad]$"],save=True)
+    make_plots(x, [ys], f"figs/models/{filename} Alpha and Beta", "Time [s]", [r"Angle$[rad]$"],save=printfigs)
 
     # ys = {r'IMU A_x': [IMU[0,:], 0.8],
     #       r'IMU A_y': [IMU[1,:], 0.8],
@@ -139,7 +145,20 @@ for filename in files:
     ax.set_xlabel('Vtas')
     ax.set_ylabel('alpha')
     ax.set_zlabel('FC[2]')
-    plt.show()
+    if show_plot:
+        plt.show()
+
+
+    # Formulating an OLS estimation of the parameters for the model:
+    # CX = CX0 + CX_alpha*alpha + CX_alpha2 + alpha**2 + CX_q*qc/V + CX_delta_e*delta_e + CX_Tc*Tc
+    # CZ = CZ0 + CZ_alpha*alpha + CZ_q*qc/V + CZ_de*de + CZ_Tc*Tc
+    # CY = CY0 + CY_beta*beta + CY_p*pb/2V + CY_r*rb/2V + CY_delta_a*delta_a + CY_delta_r*delta_r
+    # Cl = Cl0 + Cl_beta*beta + Cl_p*pb/2V + Cl_r*rb/2V + Cl_delta_a*delta_a + Cl_delta_r*delta_r
+    # Cm = Cm0 + Cm_alpha*alpha + Cm_q*qc/V + Cm_delta_e*delta_e + Cm_Tc*Tc
+    # Cn = Cn0 + Cn_beta*beta + Cn_p*pb/2V + Cn_r*rb/2V + Cn_delta_a*delta_a + Cn_delta_r*delta_r
+
+
+
     if FCs is None:
         FCs, MCs, Xs, U, Vs, alphas, betas = FCs_k, MCs_k, Xs_k, U_k, Vs_k, alphas_k, betas_k
     else:
