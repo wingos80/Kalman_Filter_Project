@@ -536,3 +536,76 @@ def c2d(Fx, dt, n_plus=0):
             temp = temp@Fx
         sum_term += temp*(dt**(n+n_plus))/np.math.factorial(n+n_plus)
     return sum_term
+
+
+def OLS_estimation(N, alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
+    
+    # Formulating an OLS estimation of the parameters for the force coefficient models:
+    # FCs[0,:] = CX = CX0 + CX_alpha*alpha + CX_alpha2*alpha**2 + CX_q*qc/V + CX_delta_e*delta_e + CX_Tc*Tc
+    # FCs[1,:] = CY = CY0 + CY_beta*beta + CY_p*pb/2V + CY_r*rb/2V + CY_delta_a*delta_a + CY_delta_r*delta_r
+    # FCs[2,:] = CZ = CZ0 + CZ_alpha*alpha + CZ_q*qc/V + CZ_de*de + CZ_Tc*Tc
+
+    A = np.zeros((N, 6))                                      # regression matrix 
+    A[:,0] = 1
+    A[:,1] = alphas_k
+    A[:,2] = alphas_k**2
+    A[:,3] = (ang_rate[1,:]*c)/V
+    A[:,4] = U_k[1,:]
+    A[:,5] = U_k[3,:]
+    theta_CX = np.linalg.inv(A.T@A)@A.T@FCs_k[0,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CX polynomial
+
+    A = np.zeros((N, 6))                                      # regression matrix
+    A[:,0] = 1
+    A[:,1] = betas_k
+    A[:,2] = (ang_rate[0,:]*b)/(2*V)
+    A[:,3] = (ang_rate[2,:]*b)/(2*V)
+    A[:,4] = U_k[0,:]
+    A[:,5] = U_k[2,:]
+    theta_CY = np.linalg.inv(A.T@A)@A.T@FCs_k[2,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CY polynomial
+
+    A = np.zeros((N, 5))                                       # regression matrix
+    A[:,0] = 1
+    A[:,1] = alphas_k
+    A[:,2] = (ang_rate[1,:]*c)/V
+    A[:,3] = U_k[1,:]
+    A[:,4] = U_k[3,:]
+    theta_CZ = np.linalg.inv(A.T@A)@A.T@FCs_k[1,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CZ polynomial
+
+
+    # Formulating an OLS estimation of the parameters for the moment coefficient models:
+    # MCs[0,:] = Cl = Cl0 + Cl_beta*beta + Cl_p*pb/2V + Cl_r*rb/2V + Cl_delta_a*delta_a + Cl_delta_r*delta_r
+    # MCs[1,:] = Cm = Cm0 + Cm_alpha*alpha + Cm_q*qc/V + Cm_delta_e*delta_e + Cm_Tc*Tc
+    # MCs[2,:] = Cn = Cn0 + Cn_beta*beta + Cn_p*pb/2V + Cn_r*rb/2V + Cn_delta_a*delta_a + Cn_delta_r*delta_r
+
+    A = np.zeros((N, 6))                                       # regression matrix
+    A[:,0] = 1
+    A[:,1] = betas_k
+    A[:,2] = (ang_rate[0,:]*b)/(2*V)
+    A[:,3] = (ang_rate[2,:]*b)/(2*V)
+    A[:,4] = U_k[0,:]
+    A[:,5] = U_k[2,:]
+    theta_Cl = np.linalg.inv(A.T@A)@A.T@MCs_k[0,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the Cl polynomial
+
+    A = np.zeros((N, 5))                                      # regression matrix
+    A[:,0] = 1
+    A[:,1] = alphas_k
+    A[:,2] = (ang_rate[1,:]*c)/V
+    A[:,3] = U_k[1,:]
+    A[:,4] = U_k[3,:]
+    theta_Cm = np.linalg.inv(A.T@A)@A.T@MCs_k[1,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the Cm polynomial
+
+    A = np.zeros((N, 6))                                      # regression matrix
+    A[:,0] = 1
+    A[:,1] = betas_k
+    A[:,2] = (ang_rate[0,:]*b)/(2*V)
+    A[:,3] = (ang_rate[2,:]*b)/(2*V)
+    A[:,4] = U_k[0,:]
+    A[:,5] = U_k[2,:]
+    theta_Cn = np.linalg.inv(A.T@A)@A.T@MCs_k[2,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the Cn polynomial
+
+
+    # Storing the master model 
+    Force_model = np.array([theta_CX, theta_CY, theta_CZ], dtype=object)    # storing all the force coefficients in one Force Model array
+    Moment_model = np.array([theta_Cl, theta_Cm, theta_Cn], dtype=object)   # storing all the moment coefficients in one Moment Model array
+
+    return Force_model, Moment_model

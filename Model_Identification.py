@@ -72,13 +72,13 @@ for i, filename in enumerate(files):
     IMU          = train_data[15:21]                 # These are the IMU measurements
 
     
-    train_data = genfromtxt('data/raw/' + filename.split("_f")[0] + ".csv", delimiter=',').T
-    train_data = train_data[:, lb:ub]
+    # train_data = genfromtxt('data/raw/' + filename.split("_f")[0] + ".csv", delimiter=',').T
+    # train_data = train_data[:, lb:ub]
 
-    # all angles should be in radians
-    p          = train_data[4]
-    q          = train_data[5]
-    r          = train_data[6]
+    # # all angles should be in radians
+    # p          = train_data[4]
+    # q          = train_data[5]
+    # r          = train_data[6]
     
     # Calculate the wind vector
     Wind = Winds[:,-25:].mean(axis=1)
@@ -87,7 +87,16 @@ for i, filename in enumerate(files):
     Bias = Biases[:,-25:].mean(axis=1)
     
     ########################################################################
-    ## Finding the force and moment derivative coefficients
+    ## Finding the force and moment coefficients for the models:
+    # Force models
+    # FCs[0,:] = CX = CX0 + CX_alpha*alpha + CX_alpha2*alpha**2 + CX_q*qc/Vinf? + CX_delta_e*delta_e + CX_Tc*Tc
+    # FCs[2,:] = CY = CY0 + CY_beta*beta + CY_p*pb/2Vinf? + CY_r*rb/2Vinf? + CY_delta_a*delta_a + CY_delta_r*delta_r
+    # FCs[1,:] = CZ = CZ0 + CZ_alpha*alpha + CZ_q*qc/Vinf? + CZ_de*de + CZ_Tc*Tc
+
+    # Moment models
+    # MCs[0,:] = Cl = Cl0 + Cl_beta*beta + Cl_p*pb/2Vinf? + Cl_r*rb/2Vinf? + Cl_delta_a*delta_a + Cl_delta_r*delta_r
+    # MCs[1,:] = Cm = Cm0 + Cm_alpha*alpha + Cm_q*qc/Vinf? + Cm_delta_e*delta_e + Cm_Tc*Tc
+    # MCs[2,:] = Cn = Cn0 + Cn_beta*beta + Cn_p*pb/2Vinf? + Cn_r*rb/2Vinf? + Cn_delta_a*delta_a + Cn_delta_r*delta_r
     ########################################################################
 
     Vs_k     = np.sqrt(Xs_k[3,:]**2 + Xs_k[4,:]**2 + Xs_k[5,:]**2)               # calculating the airspeed from the velocities
@@ -102,69 +111,8 @@ for i, filename in enumerate(files):
 
     FCs_k = kf_calc_Fc(mass, rho, S, Vs_k, vel_rate_X)                           # calculating the Fc values
     MCs_k = kf_calc_Mc(rho, b, c, S, I, Vs_k, ang_rate_X, ang_accel_X)           # calculating the Mc values
-    
-    # Formulating an OLS estimation of the parameters for the force coefficient models:
-    # FCs[0,:] = CX = CX0 + CX_alpha*alpha + CX_alpha2*alpha**2 + CX_q*qc/V + CX_delta_e*delta_e + CX_Tc*Tc
-    # FCs[1,:] = CZ = CZ0 + CZ_alpha*alpha + CZ_q*qc/V + CZ_de*de + CZ_Tc*Tc
-    # FCs[2,:] = CY = CY0 + CY_beta*beta + CY_p*pb/2V + CY_r*rb/2V + CY_delta_a*delta_a + CY_delta_r*delta_r
 
-    A = np.zeros((N, 6))                             # regression matrix 
-    A[:,0] = 1
-    A[:,1] = alphas_k
-    A[:,2] = alphas_k**2
-    A[:,3] = (ang_rate_X[1,:]*c)/Vs_k
-    A[:,4] = U_k[1,:]
-    A[:,5] = U_k[3,:]
-    theta_CX = np.linalg.inv(A.T@A)@A.T@FCs_k[0,:]   # theta = (A.T*A)^-1*A.T*C_m, parameters for the CX polynomial
-
-    A = np.zeros((N, 5))                              # regression matrix
-    A[:,0] = 1
-    A[:,1] = alphas_k
-    A[:,2] = (ang_rate_X[1,:]*c)/Vs_k
-    A[:,3] = U_k[1,:]
-    A[:,4] = U_k[3,:]
-    theta_CZ = np.linalg.inv(A.T@A)@A.T@FCs_k[1,:]   # theta = (A.T*A)^-1*A.T*C_m, parameters for the CZ polynomial
-
-    A = np.zeros((N, 6))                             # regression matrix
-    A[:,0] = 1
-    A[:,1] = betas_k
-    A[:,2] = (ang_rate_X[0,:]*b)/(2*Vs_k)
-    A[:,3] = (ang_rate_X[2,:]*b)/(2*Vs_k)
-    A[:,4] = U_k[0,:]
-    A[:,5] = U_k[2,:]
-    theta_CY = np.linalg.inv(A.T@A)@A.T@FCs_k[2,:]   # theta = (A.T*A)^-1*A.T*C_m, parameters for the CY polynomial
-
-    # Formulating an OLS estimation of the parameters for the moment coefficient models:
-    # MCs[0,:] = Cl = Cl0 + Cl_beta*beta + Cl_p*pb/2V + Cl_r*rb/2V + Cl_delta_a*delta_a + Cl_delta_r*delta_r
-    # MCs[1,:] = Cm = Cm0 + Cm_alpha*alpha + Cm_q*qc/V + Cm_delta_e*delta_e + Cm_Tc*Tc
-    # MCs[2,:] = Cn = Cn0 + Cn_beta*beta + Cn_p*pb/2V + Cn_r*rb/2V + Cn_delta_a*delta_a + Cn_delta_r*delta_r
-
-    A = np.zeros((N, 6))                              # regression matrix
-    A[:,0] = 1
-    A[:,1] = betas_k
-    A[:,2] = (ang_rate_X[0,:]*b)/(2*Vs_k)
-    A[:,3] = (ang_rate_X[2,:]*b)/(2*Vs_k)
-    A[:,4] = U_k[0,:]
-    A[:,5] = U_k[2,:]
-    theta_Cl = np.linalg.inv(A.T@A)@A.T@MCs_k[0,:]   # theta = (A.T*A)^-1*A.T*C_m, parameters for the Cl polynomial
-
-    A = np.zeros((N, 5))                             # regression matrix
-    A[:,0] = 1
-    A[:,1] = alphas_k
-    A[:,2] = (ang_rate_X[1,:]*c)/Vs_k
-    A[:,3] = U_k[1,:]
-    A[:,4] = U_k[3,:]
-    theta_Cm = np.linalg.inv(A.T@A)@A.T@MCs_k[1,:]   # theta = (A.T*A)^-1*A.T*C_m, parameters for the Cm polynomial
-
-    A = np.zeros((N, 6))                             # regression matrix
-    A[:,0] = 1
-    A[:,1] = betas_k
-    A[:,2] = (ang_rate_X[0,:]*b)/(2*Vs_k)
-    A[:,3] = (ang_rate_X[2,:]*b)/(2*Vs_k)
-    A[:,4] = U_k[0,:]
-    A[:,5] = U_k[2,:]
-    theta_Cn = np.linalg.inv(A.T@A)@A.T@MCs_k[2,:]   # theta = (A.T*A)^-1*A.T*C_m, parameters for the Cn polynomial
-
+    Force_model, Moment_model = OLS_estimation(N, alphas_k, betas_k, Vs_k[0], ang_rate_X, FCs_k, MCs_k, U_k, b, c)
 
     if FCs is None:
         FCs, MCs, Xs, U, Vs, alphas, betas = FCs_k, MCs_k, Xs_k, U_k, Vs_k, alphas_k, betas_k
@@ -177,6 +125,25 @@ for i, filename in enumerate(files):
         alphas = np.concatenate((alphas, alphas_k), axis=0)
         betas = np.concatenate((betas, betas_k), axis=0)
 
+    ########################################################################
+    ## Evaluating model residuals
+    ########################################################################
+
+    # Construct the datapoints in the solution space to evaluate model residuals
+    alphas_k, betas_k = alphas_k, betas_k
+    ps_k, qs_k, rs_k = ang_rate_X[0,:], ang_rate_X[1,:], ang_rate_X[2,:]
+    Vinf = Vs_k[0]
+    da, de, dr = U_k[0,:], U_k[1,:], U_k[2,:]
+    Tc = U_k[4,:]
+    consts = np.ones_like(alphas_k)
+
+    CX_points = np.array([consts, alphas_k, alphas_k**2, qs_k*c/Vinf, de, Tc])
+    CY_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
+    CZ_points = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
+
+    Cl_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
+    Cm_points = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
+    Cn_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
 
     ########################################################################
     ## Plotting some results for visualization
@@ -185,11 +152,6 @@ for i, filename in enumerate(files):
     
     x = dt*np.arange(0, Xs_k.shape[1], 1)
 
-    # ys = {'tc1': [U_k[3,:], 0.8],
-    #       'tc2': [U_k[4,:], 0.8]}
-    # make_plots(x, [ys], f"figs/models/{filename} Throttle Commands", "Time [s]", [r"Throttle Commands $[-]$"],save=printfigs)
-    ys = {'imu p': [p, 0.3]}
-    make_plots(x, [ys], f"figs/models/{filename} Angular Rates", "Time [s]", [r"Angular Rates $[rad/s]$"],save=printfigs, colors=['C0', 'C0', 'C1', 'C1', 'C2', 'C2'])
     # ys = {r'$\dot{p}$': [ang_accel_X[0,:], 0.8],
     #       r'$\dot{q}$': [ang_accel_X[1,:], 0.8],
     #       r'$\dot{r}$': [ang_accel_X[2,:], 0.8]}
@@ -259,31 +221,6 @@ for i, filename in enumerate(files):
     ax.set_xlabel('Vtas')
     ax.set_ylabel('alpha')
     ax.set_zlabel('FC[2]')
-
-    # Plot the OLS model over the alpha beta domain spanned by the training data
-    min_V, max_V = np.min(Vs_k), np.max(Vs_k)
-    min_alpha, max_alpha = np.min(alphas_k), np.max(alphas_k)
-
-    n = 100
-    X = np.linspace(min_alpha, max_alpha, n)
-    Y = np.linspace(min_V, max_V, n)
-    XX, YY = np.meshgrid(X, Y)
-
-    # MCs[1,:] = Cm = Cm0 + Cm_alpha*alpha + Cm_q*qc/V + Cm_delta_e*delta_e + Cm_Tc*Tc
-    Test_matrix = np.zeros((n*n, 3))
-    Test_matrix[:,0] = 1
-    Test_matrix[:,1] = XX.flatten()
-    Test_matrix[:,2] = YY.flatten()
-
-    Z = Test_matrix@theta_Cm[:3]
-
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-
-    ax.scatter(alphas_k, Vs_k, MCs_k[1,:], c='b', marker='o', alpha = 0.5, label='OLS training data', s=0.2)
-    # ax.plot_surface(XX, YY, Z.reshape(n,n), cmap=cm.coolwarm,
-    #                     linewidth=0, label='OLS model')
-
     if show_plot:
         plt.show()
 
