@@ -528,22 +528,6 @@ def kf_calc_Hx(t, X, U):
     return DHx
         
 
-# dx = 0.1
-# X = np.arange(0,10,dx)
-# Y = np.array([X**3-10*X**2])
-
-# # calculate first and second derivatives of Y numerically using the numercal derivative function i wrote
-
-# first_derivative, second_derivative = kf_finite_difference(dx,Y,step_size=2)
-
-# plt.scatter(X,Y[0],label='Yss')
-# plt.plot(X,Y[0],label='Y')
-# plt.plot(X,first_derivative[0],label='Y\'')
-# plt.plot(X,second_derivative[0],label='Y\'\'')
-# plt.legend()
-# plt.show()
-
-
 def c2d(Fx, dt, n_plus=0):
     sum_term = np.zeros_like(Fx)
     for n in range(10):

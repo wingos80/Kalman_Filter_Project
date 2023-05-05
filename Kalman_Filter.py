@@ -21,9 +21,9 @@ sns.set(style = "darkgrid")                  # Set seaborn style
 ########################################################################
 ## Start writing measurements to csv files
 ########################################################################
-save      = True             # enable saving data
-show_plot = False            # enable plotting
-printfigs = True             # enable saving figures
+save      = False             # enable saving data
+show_plot = True            # enable plotting
+printfigs = False             # enable saving figures
 
 all_results_file = open("data/all_results.csv", "w")
 all_results_file.write(f"x_kf, y_kf, z_kf, u_kf, v_kf, w_kf, phi_kf, theta_kf, psi_kf, Wx_kf, Wy_kf, Wz_kf, Lx_kf, Ly_kf, Lz_kf, Lp_kf, Lq_kf, Lr_kf, da, de, dr, Tc1, Tc2, V, alpha, beta\n")
@@ -50,9 +50,12 @@ for filename in files:
     U          = train_data[15:21]                 # These are the IMU measurements
     CTRLs      = train_data[21:]                   # These are the control inputs
 
-    vtas = train_data[-3]
-    alphas = train_data[-2]
-    betas = train_data[-1]
+
+    train_data = genfromtxt('data/raw/' + filename.split('_m')[0] + '.csv', delimiter=',').T
+    train_data = train_data[:, 1:]
+    vtas = train_data[7]
+    alphas = train_data[9]
+    betas = train_data[10]
     ########################################################################
     ## Set simulation parameters
     ########################################################################
@@ -62,7 +65,7 @@ for filename in files:
     m               = 6                          # input dimension (not used)
     dt              = 0.01                       # time step [s]
     num_samples     = len(U[0])                  # number of samples
-    epsilon         = 10**(-19)                  # IEKF threshold
+    epsilon         = 10**(-18)                  # IEKF threshold
     maxIterations   = 600                        # maximum amount of iterations per sample
 
     ########################################################################
