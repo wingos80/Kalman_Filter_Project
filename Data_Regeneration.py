@@ -122,40 +122,16 @@ for filename in files:
     airdata_t      = np.zeros([3, len(times)])       # Vtas, alpha, beta
     imu_t          = np.zeros([6, len(times)])       # Ax, Ay, Az, p, q, r
 
-    # # Storing the GPS and airdata measurements that are already known from the csv filess
-    # gps_t[3:,:]    += np.array([u_n, v_n, w_n, phi, theta, psi]) + noise_gps[3:,:]
-    # gps_t[:3,:]    += noise_gps[:3,:]
-    # airdata_t[:,:] += np.array([vtas, alpha, beta]) + noise_ads[:,:]
-    # imu_t[:,:]     += np.array([ax, ay, az, p, q, r]) + lambda_imu + noise_imu[:,:]
-
-    # #  Adding wind velocities to the 3 velocity components
-    # u_n = u_n + Wx
-    # v_n = v_n + Wy
-    # w_n = w_n + Wz
-
-
     # Storing the GPS and airdata measurements that are already known from the csv filess
-    gps_t[3:,:]    += np.array([u_n, v_n, w_n, phi, theta, psi])
-    airdata_t[:,:] += np.array([vtas, alpha, beta])
-    imu_t[:,:]     += np.array([ax, ay, az, p, q, r])
+    gps_t[3:,:]    += np.array([u_n, v_n, w_n, phi, theta, psi]) + noise_gps[3:,:]
+    gps_t[:3,:]    += noise_gps[:3,:]
+    airdata_t[:,:] += np.array([vtas, alpha, beta]) + noise_ads[:,:]
+    imu_t[:,:]     += np.array([ax, ay, az, p, q, r]) + lambda_imu + noise_imu[:,:]
 
     #  Adding wind velocities to the 3 velocity components
-    u_n = u_n
-    v_n = v_n
-    w_n = w_n
-
-    # # Use 3D scatter plot to visualize the alpha beta vtas
-    # fig = plt.figure(num=f'vtas alpha beta')
-    # axx = fig.add_subplot(projection='3d')
-
-    # axx.scatter(vtas, alpha, beta, c=times, cmap='viridis', linewidth=0.5)
-    # axx.scatter(airdata_t[0,::5], airdata_t[1,::5], airdata_t[2,::5], c=times[::5], cmap='viridis', linewidth=0.5, alpha=0.2)
-    # axx.set_xlabel('vtas')
-    # axx.set_ylabel('alpha')
-    # axx.set_zlabel('beta')
-    # axx.set_title('vtas alpha beta')
-    # axx.set_zlim(-0.001, 0.0015)
-    # plt.show()
+    u_n = u_n + Wx
+    v_n = v_n + Wy
+    w_n = w_n + Wz
     
     if save:
         result_filename = 'data/regenerated/no_noise/' + filename.replace('.csv','_measurements.csv')
@@ -184,6 +160,7 @@ for filename in files:
             
     bong = time.time()
     print(f'Elapsed time: {round(bong-bing,6)}s')
+
     ########################################################################
     ## Plotting results, and saving if desired
     ########################################################################

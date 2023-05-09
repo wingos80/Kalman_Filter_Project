@@ -41,7 +41,7 @@ betas  = None
 
 
 files = ['da3211_2_filtered.csv', 'dadoublet_1_filtered.csv', 'de3211_1_filtered.csv', 'dedoublet_1_filtered.csv', 'dr3211_1_filtered.csv', 'dr3211_2_filtered.csv']
-maneuver  = [(19, 40), (10, 15), (19.5, 30), (9.5, 15), (19.5, 29), (19.5, 29)]
+maneuver  = [(19, 40), (10, 15), (19.5, 30), (9.5, 15), (19.5, 29), (19.5, 29)]  # marking the timestamps in each csv files that contain the test manoeuvre, minimize fitting for wrong data
 os.chdir("data/filtered/a/")
 files = os.listdir(os.getcwd())
 os.chdir("../../..")
@@ -111,8 +111,9 @@ for i, filename in enumerate(files):
 
     FCs_k = kf_calc_Fc(mass, rho, S, Vs_k, vel_rate_X)                           # calculating the Fc values
     MCs_k = kf_calc_Mc(rho, b, c, S, I, Vs_k, ang_rate_X, ang_accel_X)           # calculating the Mc values
-
-    Force_model, Moment_model = OLS_estimation(N, alphas_k, betas_k, Vs_k[0], ang_rate_X, FCs_k, MCs_k, U_k, b, c)
+    FCMC = np.concatenate((FCs_k, MCs_k), axis=0)                                # concatenating the Fc and Mc values for convenience
+    
+    full_model, covariances = OLS_estimation(alphas_k, betas_k, Vs_k[0], ang_rate_X, FCs_k, MCs_k, U_k, b, c)
 
     if FCs is None:
         FCs, MCs, Xs, U, Vs, alphas, betas = FCs_k, MCs_k, Xs_k, U_k, Vs_k, alphas_k, betas_k
@@ -137,14 +138,21 @@ for i, filename in enumerate(files):
     Tc = U_k[4,:]
     consts = np.ones_like(alphas_k)
 
+    # Creating the datapoints for the model
     CX_points = np.array([consts, alphas_k, alphas_k**2, qs_k*c/Vinf, de, Tc])
     CY_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
     CZ_points = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
-
     Cl_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
     Cm_points = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
     Cn_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
+    model_points = [CX_points, CY_points, CZ_points, Cl_points, Cm_points, Cn_points]
+    model_RMSE, model_values = [], []                             # initializing the RMSE and model lists for storing
 
+    # Calculate the residuals
+    for i, pts in enumerate(model_points):
+        model_values.append(full_model[i]@pts)
+        model_RMSE.append(np.sqrt(np.sum((FCMC[i] - model_values[i])**2)))
+    
     ########################################################################
     ## Plotting some results for visualization
     ########################################################################

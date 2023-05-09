@@ -529,22 +529,43 @@ def kf_calc_Hx(t, X, U):
         
 
 def c2d(Fx, dt, n_plus=0):
-    sum_term = np.zeros_like(Fx)
+    """
+    function to transform a continuus time state space model to a discrete time state space model
+    using the matrix exponential method
+    Parameters
+    ----------
+    Fx : numpy.ndarray (n,n)
+        state matrix
+    dt : float
+        sampling time
+    n_plus : int
+        0 for the A matrix, 1 for the control matrices (B, G...)
+    Returns
+    -------
+    Fx_d : numpy.ndarray (n,n)
+        discrete time state matrix"""
+    Fx_d = np.zeros_like(Fx)
     for n in range(10):
         temp = np.eye(Fx.shape[0])
         for i in range(n):
             temp = temp@Fx
-        sum_term += temp*(dt**(n+n_plus))/np.math.factorial(n+n_plus)
-    return sum_term
+        Fx_d += temp*(dt**(n+n_plus))/np.math.factorial(n+n_plus)
+    return Fx_d
 
 
-def OLS_estimation(N, alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
+def OLS_estimation(alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
     
+    """
+    Function to estimate the parameters of the force and moment coefficient models using OLS
+    Parameters
+    ----------
+    """
     # Formulating an OLS estimation of the parameters for the force coefficient models:
     # FCs[0,:] = CX = CX0 + CX_alpha*alpha + CX_alpha2*alpha**2 + CX_q*qc/V + CX_delta_e*delta_e + CX_Tc*Tc
     # FCs[1,:] = CY = CY0 + CY_beta*beta + CY_p*pb/2V + CY_r*rb/2V + CY_delta_a*delta_a + CY_delta_r*delta_r
     # FCs[2,:] = CZ = CZ0 + CZ_alpha*alpha + CZ_q*qc/V + CZ_de*de + CZ_Tc*Tc
-
+    N = alphas_k.size
+    
     A = np.zeros((N, 6))                                      # regression matrix 
     A[:,0] = 1
     A[:,1] = alphas_k
@@ -552,7 +573,8 @@ def OLS_estimation(N, alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
     A[:,3] = (ang_rate[1,:]*c)/V
     A[:,4] = U_k[1,:]
     A[:,5] = U_k[3,:]
-    theta_CX = np.linalg.inv(A.T@A)@A.T@FCs_k[0,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CX polynomial
+    cov_CX = np.linalg.inv(A.T@A)
+    theta_CX = cov_CX@A.T@FCs_k[0,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CX polynomial
 
     A = np.zeros((N, 6))                                      # regression matrix
     A[:,0] = 1
@@ -561,7 +583,8 @@ def OLS_estimation(N, alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
     A[:,3] = (ang_rate[2,:]*b)/(2*V)
     A[:,4] = U_k[0,:]
     A[:,5] = U_k[2,:]
-    theta_CY = np.linalg.inv(A.T@A)@A.T@FCs_k[2,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CY polynomial
+    cov_CY = np.linalg.inv(A.T@A)
+    theta_CY = cov_CY@A.T@FCs_k[2,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CY polynomial
 
     A = np.zeros((N, 5))                                       # regression matrix
     A[:,0] = 1
@@ -569,7 +592,8 @@ def OLS_estimation(N, alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
     A[:,2] = (ang_rate[1,:]*c)/V
     A[:,3] = U_k[1,:]
     A[:,4] = U_k[3,:]
-    theta_CZ = np.linalg.inv(A.T@A)@A.T@FCs_k[1,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CZ polynomial
+    cov_CZ = np.linalg.inv(A.T@A)
+    theta_CZ = cov_CZ@A.T@FCs_k[1,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CZ polynomial
 
 
     # Formulating an OLS estimation of the parameters for the moment coefficient models:
@@ -584,7 +608,8 @@ def OLS_estimation(N, alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
     A[:,3] = (ang_rate[2,:]*b)/(2*V)
     A[:,4] = U_k[0,:]
     A[:,5] = U_k[2,:]
-    theta_Cl = np.linalg.inv(A.T@A)@A.T@MCs_k[0,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the Cl polynomial
+    cov_Cl = np.linalg.inv(A.T@A)
+    theta_Cl = cov_Cl@A.T@MCs_k[0,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the Cl polynomial
 
     A = np.zeros((N, 5))                                      # regression matrix
     A[:,0] = 1
@@ -592,7 +617,8 @@ def OLS_estimation(N, alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
     A[:,2] = (ang_rate[1,:]*c)/V
     A[:,3] = U_k[1,:]
     A[:,4] = U_k[3,:]
-    theta_Cm = np.linalg.inv(A.T@A)@A.T@MCs_k[1,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the Cm polynomial
+    cov_Cm = np.linalg.inv(A.T@A)
+    theta_Cm = cov_Cm@A.T@MCs_k[1,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the Cm polynomial
 
     A = np.zeros((N, 6))                                      # regression matrix
     A[:,0] = 1
@@ -601,11 +627,12 @@ def OLS_estimation(N, alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
     A[:,3] = (ang_rate[2,:]*b)/(2*V)
     A[:,4] = U_k[0,:]
     A[:,5] = U_k[2,:]
-    theta_Cn = np.linalg.inv(A.T@A)@A.T@MCs_k[2,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the Cn polynomial
+    cov_Cn = np.linalg.inv(A.T@A)
+    theta_Cn = cov_Cn@A.T@MCs_k[2,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the Cn polynomial
 
 
     # Storing the master model 
-    Force_model = np.array([theta_CX, theta_CY, theta_CZ], dtype=object)    # storing all the force coefficients in one Force Model array
-    Moment_model = np.array([theta_Cl, theta_Cm, theta_Cn], dtype=object)   # storing all the moment coefficients in one Moment Model array
+    full_model = np.array([theta_CX, theta_CY, theta_CZ, theta_Cl, theta_Cm, theta_Cn])    # storing all the force and moment coefficients
+    covariances = np.array([cov_CX, cov_CY, cov_CZ, cov_Cl, cov_Cm, cov_Cn])              # storing all the covariances
+    return full_model, covariances
 
-    return Force_model, Moment_model
