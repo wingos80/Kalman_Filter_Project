@@ -157,8 +157,8 @@ class IEKF:
         
         u, v, w = self.x_k1_k[3,0], self.x_k1_k[4,0], self.x_k1_k[5,0]
         phi, theta = self.x_k1_k[6,0], self.x_k1_k[7,0]
-        G       = np.zeros([18, 6])                      # system noise matrix
-        G[3:6, 0:3] = -np.eye(3)                         # accelerometer noise (has a negative because the Ax in the model should be Am MINUS bias MINUS noise!!!!)
+        G       = np.zeros([self.n, U_k.size])                      # system noise matrix
+        G[3:6, 0:3] = -np.eye(3)                                    # accelerometer noise (has a negative because the Ax in the model should be Am MINUS bias MINUS noise!!!!)
         G[3:9, 3:]  = np.array([[0, w, -v], 
                                 [-w, 0, u], 
                                 [v, -u, 0], 

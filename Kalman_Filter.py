@@ -34,7 +34,7 @@ files = os.listdir(os.getcwd())
 os.chdir("../../..")
 
 time1 = time.time()
-# files = ['de3211_1_measurements.csv']
+files = ['de3211_1_measurements.csv']
 for filename in files:
     print(f"\n\nFiltering data for {filename}...\n\n")
     ########################################################################

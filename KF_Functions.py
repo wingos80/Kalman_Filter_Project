@@ -8,6 +8,62 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+class model:
+    """A class for storing the model data and performing the model parameter estimations"""
+    def __init__(self, name="unnamed model", parameters={'const': None}, verbose=False):
+        self.name              = name    # name of the model
+        self.measurements      = None    # the measurements of size nx1
+
+        self.parameters        = []
+        self.regression_matrix = []
+
+        for key, value in parameters.items():
+            self.parameters.append(key)
+            self.regression_matrix.append(value)
+        self.regression_matrix = np.array(self.regression_matrix)
+        
+        self.verbose           = verbose
+
+        self.check_integrity()
+
+
+    def check_integrity(self):
+        regressor_terms = self.regression_matrix.shape[0]
+        self.num_parameters = len(self.parameters)
+        assert regressor_terms == self.num_parameters, f"The number of regressor terms and the number of parameters do not match (regressor_terms={regressor_terms}, num_parameters={self.num_parameters})"
+        
+
+    def OLS_estimate(self):
+        """
+        Performs an ordinary least squares estimation of the model parameters
+        """
+        A = self.regression_matrix
+        self.OLS_cov = np.linalg.inv(A@A.T)
+        self.OLS_params = self.OLS_cov @ A @ self.measurements
+
+        self.OLS_y = self.OLS_params@A
+        self.OLS_RMSE = np.sqrt(np.mean((self.OLS_y - self.measurements)**2))
+
+    def MLE_estimate(self):
+        # covaraince is NxN, with N = number of measurements.
+        # function to maximize:
+        #  y = self.measurements
+        #  p = self.model_evaluant
+        #  np.log(2*np.pi)**(N/2)*np.linalg.det(cov)**0.5 + 0.5(y-p)@np.linal.inv(cov)@(y-p).T
+        
+        y = self.measurements
+        self.MLE_params = np.zeros(self.num_parameters)
+        p = np.zeros_like(y)
+        N = y.size
+        epsilon = y-p
+        cov_ensemble = 1/N*epsilon.T@epsilon
+        likelihood_fn = np.log(2*np.pi)**(N/2)*np.linalg.det(cov_ensemble)**0.5 + 0.5*epsilon@np.linal.inv(cov_ensemble)@epsilon.T
+        pass
+
+
+    def RLS_estimate(self, P0=1e6*np.eye(6)):
+        pass
+
 def rk4(fn, xin, uin, t):
     """
     4th order Runge-Kutta method for solving ODEs
@@ -323,8 +379,8 @@ def kf_calc_Fx(t, X, U):
 def kf_calc_Fu(t, X, U):
     
     n = X.size
-    nm = U.size
-    DFu = np.zeros([n, nm])
+    nu = U.size
+    DFu = np.zeros([n, nu])
     g = 9.80665                # gravitational acceleration [m/s^2]
     
     # saving the individual state and input names to make the code more readable
@@ -557,6 +613,7 @@ def OLS_estimation(alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
     
     """
     Function to estimate the parameters of the force and moment coefficient models using OLS
+    DEPRECATED
     Parameters
     ----------
     """
@@ -584,7 +641,7 @@ def OLS_estimation(alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
     A[:,4] = U_k[0,:]
     A[:,5] = U_k[2,:]
     cov_CY = np.linalg.inv(A.T@A)
-    theta_CY = cov_CY@A.T@FCs_k[2,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CY polynomial
+    theta_CY = cov_CY@A.T@FCs_k[1,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CY polynomial
 
     A = np.zeros((N, 5))                                       # regression matrix
     A[:,0] = 1
@@ -593,7 +650,7 @@ def OLS_estimation(alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
     A[:,3] = U_k[1,:]
     A[:,4] = U_k[3,:]
     cov_CZ = np.linalg.inv(A.T@A)
-    theta_CZ = cov_CZ@A.T@FCs_k[1,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CZ polynomial
+    theta_CZ = cov_CZ@A.T@FCs_k[2,:]            # theta = (A.T*A)^-1*A.T*C_m, parameters for the CZ polynomial
 
 
     # Formulating an OLS estimation of the parameters for the moment coefficient models:
@@ -636,3 +693,7 @@ def OLS_estimation(alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
     covariances = np.array([cov_CX, cov_CY, cov_CZ, cov_Cl, cov_Cm, cov_Cn])              # storing all the covariances
     return full_model, covariances
 
+
+
+def RLS_estimation():
+    pass

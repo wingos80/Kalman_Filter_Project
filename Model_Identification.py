@@ -71,34 +71,16 @@ for i, filename in enumerate(files):
     train_data = train_data[:, lb:ub]
     IMU          = train_data[15:21]                 # These are the IMU measurements
 
-    
-    # train_data = genfromtxt('data/raw/' + filename.split("_f")[0] + ".csv", delimiter=',').T
-    # train_data = train_data[:, lb:ub]
+    ########################################################################
+    ## Calculating the values for some needed data
+    ########################################################################
 
-    # # all angles should be in radians
-    # p          = train_data[4]
-    # q          = train_data[5]
-    # r          = train_data[6]
-    
     # Calculate the wind vector
     Wind = Winds[:,-25:].mean(axis=1)
 
     # Calculate the biases
     Bias = Biases[:,-25:].mean(axis=1)
     
-    ########################################################################
-    ## Finding the force and moment coefficients for the models:
-    # Force models
-    # FCs[0,:] = CX = CX0 + CX_alpha*alpha + CX_alpha2*alpha**2 + CX_q*qc/Vinf? + CX_delta_e*delta_e + CX_Tc*Tc
-    # FCs[2,:] = CY = CY0 + CY_beta*beta + CY_p*pb/2Vinf? + CY_r*rb/2Vinf? + CY_delta_a*delta_a + CY_delta_r*delta_r
-    # FCs[1,:] = CZ = CZ0 + CZ_alpha*alpha + CZ_q*qc/Vinf? + CZ_de*de + CZ_Tc*Tc
-
-    # Moment models
-    # MCs[0,:] = Cl = Cl0 + Cl_beta*beta + Cl_p*pb/2Vinf? + Cl_r*rb/2Vinf? + Cl_delta_a*delta_a + Cl_delta_r*delta_r
-    # MCs[1,:] = Cm = Cm0 + Cm_alpha*alpha + Cm_q*qc/Vinf? + Cm_delta_e*delta_e + Cm_Tc*Tc
-    # MCs[2,:] = Cn = Cn0 + Cn_beta*beta + Cn_p*pb/2Vinf? + Cn_r*rb/2Vinf? + Cn_delta_a*delta_a + Cn_delta_r*delta_r
-    ########################################################################
-
     Vs_k     = np.sqrt(Xs_k[3,:]**2 + Xs_k[4,:]**2 + Xs_k[5,:]**2)               # calculating the airspeed from the velocities
     alphas_k = np.arctan2(Xs_k[5,:], Xs_k[3,:])                                  # calculating the angle of attack from the velocities
     betas_k  = np.arctan2(Xs_k[4,:], np.sqrt(Xs_k[3,:]**2 + Xs_k[5,:]**2))       # calculating the sideslip angle from the velocities
@@ -111,9 +93,65 @@ for i, filename in enumerate(files):
 
     FCs_k = kf_calc_Fc(mass, rho, S, Vs_k, vel_rate_X)                           # calculating the Fc values
     MCs_k = kf_calc_Mc(rho, b, c, S, I, Vs_k, ang_rate_X, ang_accel_X)           # calculating the Mc values
-    FCMC = np.concatenate((FCs_k, MCs_k), axis=0)                                # concatenating the Fc and Mc values for convenience
+    ########################################################################
+    ## Estimating the parameters for the force and moment models:
+    # Force models
+    # FCs[0,:] = CX = CX0 + CX_alpha*alpha + CX_alpha2*alpha**2 + CX_q*qc/Vinf? + CX_delta_e*delta_e + CX_Tc*Tc
+    # FCs[2,:] = CY = CY0 + CY_beta*beta + CY_p*pb/2Vinf? + CY_r*rb/2Vinf? + CY_delta_a*delta_a + CY_delta_r*delta_r
+    # FCs[1,:] = CZ = CZ0 + CZ_alpha*alpha + CZ_q*qc/Vinf? + CZ_de*de + CZ_Tc*Tc
+
+    # Moment models
+    # MCs[0,:] = Cl = Cl0 + Cl_beta*beta + Cl_p*pb/2Vinf? + Cl_r*rb/2Vinf? + Cl_delta_a*delta_a + Cl_delta_r*delta_r
+    # MCs[1,:] = Cm = Cm0 + Cm_alpha*alpha + Cm_q*qc/Vinf? + Cm_delta_e*delta_e + Cm_Tc*Tc
+    # MCs[2,:] = Cn = Cn0 + Cn_beta*beta + Cn_p*pb/2Vinf? + Cn_r*rb/2Vinf? + Cn_delta_a*delta_a + Cn_delta_r*delta_r
+    ########################################################################
+
+    # Construct the datapoints in the solution space
+    alphas_k, betas_k = alphas_k, betas_k
+    ps_k, qs_k, rs_k  = ang_rate_X[0,:], ang_rate_X[1,:], ang_rate_X[2,:]
+    Vinf              = Vs_k[0]
+    da, de, dr        = U_k[0,:], U_k[1,:], U_k[2,:]
+    Tc                = U_k[4,:]
+    consts            = np.ones_like(alphas_k)
     
-    full_model, covariances = OLS_estimation(alphas_k, betas_k, Vs_k[0], ang_rate_X, FCs_k, MCs_k, U_k, b, c)
+
+
+
+    
+    CX_model = model(name="CX model")
+    CX_model.regression_matrix = np.array([consts, alphas_k, alphas_k**2, qs_k*c/Vinf, de, Tc])
+    CX_model.measurements = FCs_k[0]
+
+    CY_model = model(name="CY model")
+    CY_model.regression_matrix = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
+    CY_model.measurements = FCs_k[1]
+    
+    CZ_model = model(name="CY model")
+    CZ_model.regression_matrix = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
+    CZ_model.measurements = FCs_k[2]
+
+    Cl_model = model(name="Cl model")
+    Cl_model.regression_matrix = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
+    Cl_model.measurements = MCs_k[0]
+
+    Cm_model = model(name="Cm model")
+    Cm_model.regression_matrix = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
+    Cm_model.measurements = MCs_k[1]
+
+    Cn_model = model(name="Cn model")
+    Cn_model.regression_matrix = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
+    Cn_model.measurements = MCs_k[2]
+
+    models = [CX_model, CY_model, CZ_model, Cl_model, Cm_model, Cn_model]
+
+    for model in models:
+        model.OLS_estimate()
+
+    # CZ_points = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
+    # Cl_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
+    # Cm_points = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
+    # Cn_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
+    # full_model, covariances = OLS_estimation(alphas_k, betas_k, Vs_k[0], ang_rate_X, FCs_k, MCs_k, U_k, b, c)
 
     if FCs is None:
         FCs, MCs, Xs, U, Vs, alphas, betas = FCs_k, MCs_k, Xs_k, U_k, Vs_k, alphas_k, betas_k
@@ -126,32 +164,6 @@ for i, filename in enumerate(files):
         alphas = np.concatenate((alphas, alphas_k), axis=0)
         betas = np.concatenate((betas, betas_k), axis=0)
 
-    ########################################################################
-    ## Evaluating model residuals
-    ########################################################################
-
-    # Construct the datapoints in the solution space to evaluate model residuals
-    alphas_k, betas_k = alphas_k, betas_k
-    ps_k, qs_k, rs_k = ang_rate_X[0,:], ang_rate_X[1,:], ang_rate_X[2,:]
-    Vinf = Vs_k[0]
-    da, de, dr = U_k[0,:], U_k[1,:], U_k[2,:]
-    Tc = U_k[4,:]
-    consts = np.ones_like(alphas_k)
-
-    # Creating the datapoints for the model
-    CX_points = np.array([consts, alphas_k, alphas_k**2, qs_k*c/Vinf, de, Tc])
-    CY_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
-    CZ_points = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
-    Cl_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
-    Cm_points = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
-    Cn_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
-    model_points = [CX_points, CY_points, CZ_points, Cl_points, Cm_points, Cn_points]
-    model_RMSE, model_values = [], []                             # initializing the RMSE and model lists for storing
-
-    # Calculate the residuals
-    for i, pts in enumerate(model_points):
-        model_values.append(full_model[i]@pts)
-        model_RMSE.append(np.sqrt(np.sum((FCMC[i] - model_values[i])**2)))
     
     ########################################################################
     ## Plotting some results for visualization
