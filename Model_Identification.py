@@ -120,27 +120,27 @@ for i, filename in enumerate(files):
     
     CX_model = model(name="CX model")
     CX_model.regression_matrix = np.array([consts, alphas_k, alphas_k**2, qs_k*c/Vinf, de, Tc])
-    CX_model.measurements = FCs_k[0]
+    CX_model.measurements = FCs_k[0].reshape(N,1)
 
     CY_model = model(name="CY model")
     CY_model.regression_matrix = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
-    CY_model.measurements = FCs_k[1]
+    CY_model.measurements = FCs_k[1].reshape(N,1)
     
     CZ_model = model(name="CY model")
     CZ_model.regression_matrix = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
-    CZ_model.measurements = FCs_k[2]
+    CZ_model.measurements = FCs_k[2].reshape(N,1)
 
     Cl_model = model(name="Cl model")
     Cl_model.regression_matrix = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
-    Cl_model.measurements = MCs_k[0]
+    Cl_model.measurements = MCs_k[0].reshape(N,1)
 
     Cm_model = model(name="Cm model")
     Cm_model.regression_matrix = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
-    Cm_model.measurements = MCs_k[1]
+    Cm_model.measurements = MCs_k[1].reshape(N,1)
 
     Cn_model = model(name="Cn model")
     Cn_model.regression_matrix = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
-    Cn_model.measurements = MCs_k[2]
+    Cn_model.measurements = MCs_k[2].reshape(N,1)
 
     models = [CX_model, CY_model, CZ_model, Cl_model, Cm_model, Cn_model]
 

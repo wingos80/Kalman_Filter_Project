@@ -7,42 +7,82 @@
 ########################################################################
 import numpy as np
 import matplotlib.pyplot as plt
+from Optimize import *
 
 class model:
     """A class for storing the model data and performing the model parameter estimations"""
-    def __init__(self, name="unnamed model", parameters={'const': None}, verbose=False):
+    def __init__(self, regression_matrix, name="unnamed model", verbose=False):
         self.name              = name    # name of the model
+        self.regression_matrix = regression_matrix    # the regression matrix of size nxm, m=num of parameters and n=num of measurements 
+        self.n_params = self.regression_matrix.shape[1]
         self.measurements      = None    # the measurements of size nx1
-
-        self.parameters        = []
-        self.regression_matrix = []
-
-        for key, value in parameters.items():
-            self.parameters.append(key)
-            self.regression_matrix.append(value)
-        self.regression_matrix = np.array(self.regression_matrix)
-        
         self.verbose           = verbose
+        self.trigger = True
 
-        self.check_integrity()
-
-
-    def check_integrity(self):
-        regressor_terms = self.regression_matrix.shape[0]
-        self.num_parameters = len(self.parameters)
-        assert regressor_terms == self.num_parameters, f"The number of regressor terms and the number of parameters do not match (regressor_terms={regressor_terms}, num_parameters={self.num_parameters})"
+    # def check_integrity(self):
+    #     regressor_terms = self.regression_matrix.shape[0]
+    #     self.num_parameters = self.parameters.size
+    #     assert regressor_terms == self.num_parameters, f"The number of regressor terms and the number of parameters do not match (regressor_terms={regressor_terms}, num_parameters={self.num_parameters})"
         
-
     def OLS_estimate(self):
         """
         Performs an ordinary least squares estimation of the model parameters
         """
         A = self.regression_matrix
-        self.OLS_cov = np.linalg.inv(A@A.T)
-        self.OLS_params = self.OLS_cov @ A @ self.measurements
+        self.OLS_cov = np.linalg.inv(A.T@A)
+        self.OLS_params = self.OLS_cov@A.T@self.measurements
 
-        self.OLS_y = self.OLS_params@A
-        self.OLS_RMSE = np.sqrt(np.mean((self.OLS_y - self.measurements)**2))
+        self.OLS_y = (A@self.OLS_params)
+        # self.OLS_RMSE = np.sqrt(np.sum((self.OLS_y - self.measurements)**2))
+
+
+    def log_likelihood(self, MLE_params):
+        MLE_params = MLE_params.T
+        y = self.measurements
+        p = self.regression_matrix@MLE_params
+        N = y.size
+        epsilons = y-p
+        likelihoods = np.zeros(epsilons.shape[1])
+        for i in range(epsilons.shape[1]):
+            epsilon         = epsilons[:,[i]]
+            # cov_ensemble    = (1/N*epsilon.T@epsilon)[0,0
+            # epsilon_squared = (epsilon.T@epsilon)[0,0]
+            # cov_ensemble = np.eye(N)
+            # inv_cov = np.linalg.inv(cov_ensemble)
+            # det_cov = np.linalg.det(cov_ensemble)]
+            # likelihood      = 1/(np.log(2*np.pi)**(N/2)*cov_ensemble**0.5)*np.exp(-0.5/cov_ensemble*epsilon_squared)
+            # likelihood      = -(N/2)*np.log(2*np.pi)-0.5*np.log(det_cov)-0.5*epsilon.T@inv_cov@epsilon
+            # likelihood      = 1/((2*np.pi)**(N/2)*det_cov**0.5)*np.exp(-0.5*epsilon.T@inv_cov@epsilon)
+            # likelihood      = np.exp(-0.5/cov_ensemble*epsilon_squared)
+            likelihood = np.exp(np.sum(epsilon**2))
+            likelihoods[i]  = likelihood
+        return likelihoods
+
+    def log_likelihood2(self, MLE_params):
+        MLE_params = MLE_params.reshape(self.n_params,1)    # making the params into a column vector so that it can be used in matrix calculations
+        y = self.measurements
+        p = self.regression_matrix@MLE_params
+        N = y.size
+        epsilon = y-p
+        ensemble_cov = np.sum(np.exp(epsilon**2))/N
+        
+        likelihood = 0.5/ensemble_cov*epsilon.T@epsilon + N/2*np.log(ensemble_cov)
+        # likelihood = np.sum(np.exp(epsilon**2))
+        # if self.trigger:
+        #     self.MLE_ensemble_epsilon = epsilon
+        #     self.trigger = False
+        # else:
+        #     self.MLE_ensemble_epsilon = np.hstack((self.MLE_ensemble_epsilon, epsilon))
+        #     ensemble_shape = self.MLE_ensemble_epsilon.shape
+        #     if ensemble_shape[1] > ensemble_shape[0]:
+        #         self.MLE_ensemble_epsilon = self.MLE_ensemble_epsilon[:,1:]
+        #         ensemble_cov = self.MLE_ensemble_epsilon@self.MLE_ensemble_epsilon.T
+        #         ensemble_det = np.linalg.det(ensemble_cov)
+        #         likelihood = np.exp(epsilon.T@np.linalg.inv(ensemble_cov)@epsilon)
+
+        
+        return likelihood
+
 
     def MLE_estimate(self):
         # covaraince is NxN, with N = number of measurements.
@@ -51,15 +91,18 @@ class model:
         #  p = self.model_evaluant
         #  np.log(2*np.pi)**(N/2)*np.linalg.det(cov)**0.5 + 0.5(y-p)@np.linal.inv(cov)@(y-p).T
         
-        y = self.measurements
-        self.MLE_params = np.zeros(self.num_parameters)
-        p = np.zeros_like(y)
-        N = y.size
-        epsilon = y-p
-        cov_ensemble = 1/N*epsilon.T@epsilon
-        likelihood_fn = np.log(2*np.pi)**(N/2)*np.linalg.det(cov_ensemble)**0.5 + 0.5*epsilon@np.linal.inv(cov_ensemble)@epsilon.T
-        pass
-
+        # two possible errors:
+        # 1. the log likelihood should be max(-np.log(2*np.pi)**(N/2)*np.linalg.det(cov)**0.5 - 0.5(y-p)@np.linal.inv(cov)@(y-p))
+        # 2. the cov matrix should be MxM, M being number of params
+        g = 20
+        n = 100 # number of particles
+        A = self.regression_matrix
+        test = ES(fitness_function=self.log_likelihood2, num_dimensions=self.n_params, num_generations=200, num_offspring_per_individual=6)
+        print('\n\nrunning ES....\n\n')
+        self.MLE_params = test.run()
+        self.MLE_best = test.group_best_fit
+        self.MLE_y = A@self.MLE_params.reshape(self.n_params,1)
+        # self.MLE_RMSE = np.sqrt(np.sum((self.MLE_y - self.measurements)**2))
 
     def RLS_estimate(self, P0=1e6*np.eye(6)):
         pass
@@ -693,7 +736,3 @@ def OLS_estimation(alphas_k, betas_k, V, ang_rate, FCs_k, MCs_k, U_k, b, c):
     covariances = np.array([cov_CX, cov_CY, cov_CZ, cov_Cl, cov_Cm, cov_Cn])              # storing all the covariances
     return full_model, covariances
 
-
-
-def RLS_estimation():
-    pass
