@@ -9,13 +9,18 @@ from Plotter import *
 from matplotlib import cm
 
 
+########################################################################
+## Set script parameters
+########################################################################
 np.random.seed(7)                            # Set random seed for reproducibility
 sns.set(style = "darkgrid")                  # Set seaborn style    
 
+save      = False             # enable saving data
+show_plot = True            # enable plotting
+printfigs = False             # enable saving figures
 ########################################################################
 ## Set aircraft parameters
 ########################################################################
-
 # aircraft parameters
 Ixx = 11187.8       # [kgm^2]
 Iyy = 22854.8       # [kgm^2]
@@ -46,9 +51,6 @@ os.chdir("data/filtered/a/")
 files = os.listdir(os.getcwd())
 os.chdir("../../..")
 
-save      = False             # enable saving data
-show_plot = True            # enable plotting
-printfigs = False             # enable saving figures
 for i, filename in enumerate(files):
     print(f"\n\nProcessing data for {filename}...\n\n")
     lb ,ub = int(maneuver[i][0]/dt), int(maneuver[i][1]/dt)
@@ -144,11 +146,11 @@ for i, filename in enumerate(files):
     for model_k in models:
         model_k.OLS_estimate()
         model_k.MLE_estimate()
+        model_k.RLS_estimate()
 
-        OLS_RMSE = np.sqrt(np.mean((model_k.OLS_y - model_k.measurements)**2))
-        MLE_RMSE = np.sqrt(np.mean((model_k.MLE_y - model_k.measurements)**2))
-        print(f'{model_k.name} OLS params: {model_k.OLS_params} (RMSE: {OLS_RMSE})')
-        print(f'{model_k.name} MLE params: {model_k.MLE_params} (RMSE: {MLE_RMSE})')
+        print(f'{model_k.name} OLS params: {model_k.OLS_params} (RMSE: {model_k.OLS_RMSE})')
+        print(f'{model_k.name} MLE params: {model_k.MLE_params} (RMSE: {model_k.MLE_RMSE})')
+        print(f'{model_k.name} RLS params: {model_k.RLS_params} (RMSE: {model_k.RLS_RMSE})')
 
     # CZ_points = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
     # Cl_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])

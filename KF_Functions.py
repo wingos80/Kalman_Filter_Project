@@ -27,13 +27,14 @@ class model:
         """
         Performs an ordinary least squares estimation of the model parameters
         """
+        if self.verbose: print(f'\nEstimating parameters with ordinary least squares...\n')
         A = self.regression_matrix
         self.OLS_cov = np.linalg.inv(A.T@A)
         self.OLS_params = self.OLS_cov@A.T@self.measurements
 
         self.OLS_y = (A@self.OLS_params)
         self.OLS_RMSE = self.calc_RMSE(self.OLS_y, self.measurements)  # calculating the RMSE of the OLS estimate
-
+        if self.verbose: print(f'\nFinished OLS\n')
 
     def MLE_estimate(self, solver="ES"):
         """
@@ -48,31 +49,35 @@ class model:
         # two possible errors:
         # 1. the log likelihood should be max(-np.log(2*np.pi)**(N/2)*np.linalg.det(cov)**0.5 - 0.5(y-p)@np.linal.inv(cov)@(y-p))
         # 2. the cov matrix should be MxM, M being number of params
+        if self.verbose: print(f'\nEstimating parameters with maximum likelihood...\n')
         g    = 20
         n    = 100                         # number of particles
         A    = self.regression_matrix
 
         if solver=="ES":
-            print(f'\nRunning Evolutionary Strategies to optimize the Maximum Likelihood...\n')
+            if self.verbose: print(f'\nRunning Evolutionary Strategies to optimize the Maximum Likelihood...\n')
             test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_generations=200, num_offspring_per_individual=6, verbose=False)
-            print(f'\nFinished Evolutionary Strategies Maximum Likelihood \n')
+            if self.verbose: print(f'\nFinished Evolutionary Strategies Maximum Likelihood \n')
             self.MLE_params = test.run().reshape(self.n_params,1)
             self.MLE_best   = test.group_best_fit
         elif solver=="scipy":
+            if self.verbose: print(f'\nRunning Scipy to optimize the Maximum Likelihood...\n')
             self.MLE_params = np.random.rand(self.n_params,1)
             self.MLE_params = minimize(self.log_likelihood, self.MLE_params).x
+            if self.verbose: print(f'\nFinished Scipy Maximum Likelihood \n')
             self.MLE_best   = 1
         else:
             raise ValueError(f"Solver {solver} not recognized. Please choose either 'ES' or 'scipy'")
         
         self.MLE_y      = A@self.MLE_params.reshape(self.n_params,1)       
         self.MLE_RMSE   = self.calc_RMSE(self.MLE_y, self.measurements)    # calculating the RMSE of the MLE estimate
-
+        if self.verbose: print(f'\nFinished MLE\n')
 
     def RLS_estimate(self):
         """
         Performs a recursive least squares estimation of the model parameters
         """
+        if self.verbose: print(f'\nEstimating parameters with recursive least squares...\n')
         RLS_params          = np.zeros((self.n_params,1))   # initializing the RLS parameters
         P                   = np.eye(self.n_params)         # initializing the RLS covariance matrix
         A                   = self.regression_matrix        # shorter names for readability
@@ -104,7 +109,8 @@ class model:
         self.RLS_y      = A@RLS_params
         self.RLS_cov    = P
         self.RLS_params = RLS_params
-
+        self.RLS_RMSE = self.calc_RMSE(self.RLS_y, self.measurements)    # calculating the RMSE of the RLS estimate
+        if self.verbose: print(f'\nFinished RLS\n')
 
     def log_likelihood(self, MLE_params):
         """
