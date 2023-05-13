@@ -195,7 +195,6 @@ class Differential_Evolution:
         return converged, itr_taken, self.particles
 
 
-
 class Individual:
     def __init__(self, genotype, strategy_parameters):
         self.genotype = genotype

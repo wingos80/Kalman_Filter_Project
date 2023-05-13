@@ -76,7 +76,6 @@ for i, filename in enumerate(files):
     ########################################################################
     ## Calculating the values for some needed data
     ########################################################################
-
     # Calculate the wind vector
     Wind = Winds[:,-25:].mean(axis=1)
 
@@ -97,17 +96,18 @@ for i, filename in enumerate(files):
     MCs_k = kf_calc_Mc(rho, b, c, S, I, Vs_k, ang_rate_X, ang_accel_X)           # calculating the Mc values
     ########################################################################
     ## Estimating the parameters for the force and moment models:
-    # Force models
-    # FCs[0,:] = CX = CX0 + CX_alpha*alpha + CX_alpha2*alpha**2 + CX_q*qc/Vinf? + CX_delta_e*delta_e + CX_Tc*Tc
-    # FCs[2,:] = CY = CY0 + CY_beta*beta + CY_p*pb/2Vinf? + CY_r*rb/2Vinf? + CY_delta_a*delta_a + CY_delta_r*delta_r
-    # FCs[1,:] = CZ = CZ0 + CZ_alpha*alpha + CZ_q*qc/Vinf? + CZ_de*de + CZ_Tc*Tc
+    """
+    Force models
+    FCs[0,:] = CX = CX0 + CX_alpha*alpha + CX_alpha2*alpha**2 + CX_q*qc/Vinf? + CX_delta_e*delta_e + CX_Tc*Tc
+    FCs[2,:] = CY = CY0 + CY_beta*beta + CY_p*pb/2Vinf? + CY_r*rb/2Vinf? + CY_delta_a*delta_a + CY_delta_r*delta_r
+    FCs[1,:] = CZ = CZ0 + CZ_alpha*alpha + CZ_q*qc/Vinf? + CZ_de*de + CZ_Tc*Tc
 
-    # Moment models
-    # MCs[0,:] = Cl = Cl0 + Cl_beta*beta + Cl_p*pb/2Vinf? + Cl_r*rb/2Vinf? + Cl_delta_a*delta_a + Cl_delta_r*delta_r
-    # MCs[1,:] = Cm = Cm0 + Cm_alpha*alpha + Cm_q*qc/Vinf? + Cm_delta_e*delta_e + Cm_Tc*Tc
-    # MCs[2,:] = Cn = Cn0 + Cn_beta*beta + Cn_p*pb/2Vinf? + Cn_r*rb/2Vinf? + Cn_delta_a*delta_a + Cn_delta_r*delta_r
+    Moment models
+    MCs[0,:] = Cl = Cl0 + Cl_beta*beta + Cl_p*pb/2Vinf? + Cl_r*rb/2Vinf? + Cl_delta_a*delta_a + Cl_delta_r*delta_r
+    MCs[1,:] = Cm = Cm0 + Cm_alpha*alpha + Cm_q*qc/Vinf? + Cm_delta_e*delta_e + Cm_Tc*Tc
+    MCs[2,:] = Cn = Cn0 + Cn_beta*beta + Cn_p*pb/2Vinf? + Cn_r*rb/2Vinf? + Cn_delta_a*delta_a + Cn_delta_r*delta_r
+    """
     ########################################################################
-
     # Construct the datapoints in the solution space
     alphas_k, betas_k = alphas_k, betas_k
     ps_k, qs_k, rs_k  = ang_rate_X[0,:], ang_rate_X[1,:], ang_rate_X[2,:]
@@ -116,47 +116,35 @@ for i, filename in enumerate(files):
     Tc                = U_k[4,:]
     consts            = np.ones_like(alphas_k)
     
-
-
-
-    
-    CX_model = model(np.array([consts, alphas_k, alphas_k**2, qs_k*c/Vinf, de, Tc]).T, name="CX model")
+    CX_model = model(np.array([consts, alphas_k, alphas_k**2, qs_k*c/Vinf, de, Tc]).T,    name="CX model")
     CX_model.measurements = FCs_k[0].reshape(N,1)
 
     CY_model = model(np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr]).T, name="CY model")
     CY_model.measurements = FCs_k[1].reshape(N,1)
     
-    CZ_model = model(np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc]).T, name="CY model")
+    CZ_model = model(np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc]).T,                 name="CY model")
     CZ_model.measurements = FCs_k[2].reshape(N,1)
 
-    # Cl_model = model(name="Cl model")
-    # Cl_model.regression_matrix = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
-    # Cl_model.measurements = MCs_k[0].reshape(N,1)
+    Cl_model = model(np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr]).T, name="Cl model")
+    Cl_model.measurements = MCs_k[0].reshape(N,1)
 
-    # Cm_model = model(name="Cm model")
-    # Cm_model.regression_matrix = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
-    # Cm_model.measurements = MCs_k[1].reshape(N,1)
+    Cm_model = model(np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc]).T,                 name="Cm model")
+    Cm_model.measurements = MCs_k[1].reshape(N,1)
 
-    # Cn_model = model(name="Cn model")
-    # Cn_model.regression_matrix = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
-    # Cn_model.measurements = MCs_k[2].reshape(N,1)
+    Cn_model = model(np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr]).T, name="Cn model")
+    Cn_model.measurements = MCs_k[2].reshape(N,1)
 
     models = [CX_model]
 
     for model_k in models:
+        model_k.verbose = True
         model_k.OLS_estimate()
         model_k.MLE_estimate()
-        model_k.RLS_estimate()
+        # model_k.RLS_estimate()
 
         print(f'{model_k.name} OLS params: {model_k.OLS_params} (RMSE: {model_k.OLS_RMSE})')
         print(f'{model_k.name} MLE params: {model_k.MLE_params} (RMSE: {model_k.MLE_RMSE})')
-        print(f'{model_k.name} RLS params: {model_k.RLS_params} (RMSE: {model_k.RLS_RMSE})')
-
-    # CZ_points = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
-    # Cl_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
-    # Cm_points = np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc])
-    # Cn_points = np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr])
-    # full_model, covariances = OLS_estimation(alphas_k, betas_k, Vs_k[0], ang_rate_X, FCs_k, MCs_k, U_k, b, c)
+        # print(f'{model_k.name} RLS params: {model_k.RLS_params} (RMSE: {model_k.RLS_RMSE})')
 
     if FCs is None:
         FCs, MCs, Xs, U, Vs, alphas, betas = FCs_k, MCs_k, Xs_k, U_k, Vs_k, alphas_k, betas_k
@@ -167,14 +155,10 @@ for i, filename in enumerate(files):
         U = np.concatenate((U, U_k), axis=1)
         Vs = np.concatenate((Vs, Vs_k), axis=0)
         alphas = np.concatenate((alphas, alphas_k), axis=0)
-        betas = np.concatenate((betas, betas_k), axis=0)
-
-    
+        betas = np.concatenate((betas, betas_k), axis=0)    
     ########################################################################
     ## Plotting some results for visualization
     ########################################################################
-
-    
     x = dt*np.arange(0, Xs_k.shape[1], 1)
 
     # ys = {r'$\dot{p}$': [ang_accel_X[0,:], 0.8],
