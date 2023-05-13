@@ -2,7 +2,7 @@ import timeit
 from scipy.spatial import ConvexHull
 import numpy as np
 import matplotlib.pyplot as plt
-# np.random.seed(7)
+np.random.seed(1)
 pts = 5
 
 class Differential_Evolution:
@@ -236,15 +236,16 @@ class ES:
         else:
             self.terminate_confidence = 0
 
-        if self.terminate_confidence > 12:
+        if self.terminate_confidence > 40:
             return True
         else:
             return False
         
     def run(self):
         population = [self.generate_random_individual() for _ in range(self.num_individuals)]
-        best = sorted(population, key=lambda individual: self.fitness_function(individual.genotype))[0]
-
+        # best = sorted(population, key=lambda individual: self.fitness_function(individual.genotype))[0]
+        best = population[0]
+        x = np.arange(-2,4,0.1)
         self.group_best_fit = self.fitness_function(best.genotype)
         self.itr_best_fit = self.group_best_fit
         tic = timeit.default_timer()
@@ -263,7 +264,7 @@ class ES:
                     parent_genotype = parent.genotype
                     parent_strategy_parameter = parent.strategy_parameters[0]
                     new_genotype = np.array([parent_genotype[i]+np.random.normal(0,parent_strategy_parameter) for i in range(self.num_dimensions)])
-                    new_strategy_parameters = np.array([max(parent_strategy_parameter*np.exp(np.random.normal(0,1/self.num_dimensions)),10**(-6))])
+                    new_strategy_parameters = np.array([max(parent_strategy_parameter*np.exp(np.random.normal(0,1/self.num_dimensions)),10**(-4))])
                     offsprings.append(Individual(new_genotype, new_strategy_parameters))
             population += offsprings
             # population = sorted(population, key=lambda individual: self.fitness_function(individual.genotype))[:self.num_individuals]
@@ -271,7 +272,7 @@ class ES:
             selection = []
             selection_pool = population.copy()  
             pool_fitness = np.array([self.fitness_function(individual.genotype) for individual in population])
-            tournament_size = 17
+            tournament_size = 14
             for i in range(self.num_individuals):
                 # print(f'shape of selection pool and fitness: {selection_pool.shape}, {pool_fitness.shape}')
                 match = np.random.choice(np.arange(0,int(len(selection_pool))), tournament_size, replace=False)
@@ -285,13 +286,23 @@ class ES:
 
             all_fitnesses = np.array([self.fitness_function(individual.genotype) for individual in population])
 
-            best = population[np.argmin(all_fitnesses)]
-            self.itr_best_fit = self.fitness_function(best.genotype)
+            itr_best            = population[np.argmin(all_fitnesses)]
+            self.itr_best_fit   = self.fitness_function(itr_best.genotype)
+
+
+            best                = itr_best if self.itr_best_fit < self.group_best_fit else best
             self.group_best_fit = self.itr_best_fit if self.itr_best_fit < self.group_best_fit else self.group_best_fit
 
-            if self.terminate():
-                break
+            # if self.terminate():
+            #     break
             if self.verbose:
+                plt.figure(1)
+                y = itr_best.genotype[0] + itr_best.genotype[1]*x + itr_best.genotype[2]*x**2 + itr_best.genotype[3]*x**3 + itr_best.genotype[4]*x**4
+                plt.plot(x,y)
+                plt.ylim(-2.5,6)
+                plt.grid()
+                plt.pause(0.2)
+                plt.clf()
                 print(f"[gen {generation:3}] Best fitness: {self.fitness_function(best.genotype)}")
             # if generation%10==0:
             #     print(f'{round(toc-tic,6)} s tour size{tournament_size}\nself.itr_best_fit: {self.itr_best_fit}\nself.group_best_fit: {self.group_best_fit}\n\n')
@@ -303,7 +314,7 @@ class ES:
         # - For the genotype, sample a standard random normal distribution for each variable separately
         # - For the strategy parameter, sample a standard random normal distribution and then take the maximum of that sample and 0.1 
         #   (to ensure it is not negative and not too small for exploration)
-        return Individual(np.array([np.random.normal(0,1) for _ in range(self.num_dimensions)]), np.array([max(np.random.normal(0,3), 0.1) for _ in range(self.num_dimensions)]))
+        return Individual(np.array([np.random.normal(0,1) for _ in range(self.num_dimensions)]), np.array([max(np.random.normal(0,5), 0.1) for _ in range(self.num_dimensions)]))
 
 
 def ewma(s_prev, x, rho, i):

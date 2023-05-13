@@ -8,9 +8,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from Optimize import *
-
+from scipy.optimize import minimize
 class model:
-    """A class for storing the model data and performing the model parameter estimations"""
+    """A class for storing the model data and performing the model parameter estimations
+    Currently can estimate the model parameters  using: OLS, MLE, or RLS (MLE likelihood function likely incorrect)"""
     def __init__(self, regression_matrix, name="unnamed model", verbose=False):
         self.name              = name    # name of the model
         self.regression_matrix = regression_matrix    # the regression matrix of size nxm, m=num of parameters and n=num of measurements 
@@ -19,11 +20,9 @@ class model:
         self.verbose           = verbose
         self.trigger = True
 
-    # def check_integrity(self):
-    #     regressor_terms = self.regression_matrix.shape[0]
-    #     self.num_parameters = self.parameters.size
-    #     assert regressor_terms == self.num_parameters, f"The number of regressor terms and the number of parameters do not match (regressor_terms={regressor_terms}, num_parameters={self.num_parameters})"
-        
+        name_of_var = 1
+
+
     def OLS_estimate(self):
         """
         Performs an ordinary least squares estimation of the model parameters
@@ -33,58 +32,13 @@ class model:
         self.OLS_params = self.OLS_cov@A.T@self.measurements
 
         self.OLS_y = (A@self.OLS_params)
-        # self.OLS_RMSE = np.sqrt(np.sum((self.OLS_y - self.measurements)**2))
+        self.OLS_RMSE = self.calc_RMSE(self.OLS_y, self.measurements)  # calculating the RMSE of the OLS estimate
 
 
-    def log_likelihood(self, MLE_params):
-        MLE_params = MLE_params.T
-        y = self.measurements
-        p = self.regression_matrix@MLE_params
-        N = y.size
-        epsilons = y-p
-        likelihoods = np.zeros(epsilons.shape[1])
-        for i in range(epsilons.shape[1]):
-            epsilon         = epsilons[:,[i]]
-            # cov_ensemble    = (1/N*epsilon.T@epsilon)[0,0
-            # epsilon_squared = (epsilon.T@epsilon)[0,0]
-            # cov_ensemble = np.eye(N)
-            # inv_cov = np.linalg.inv(cov_ensemble)
-            # det_cov = np.linalg.det(cov_ensemble)]
-            # likelihood      = 1/(np.log(2*np.pi)**(N/2)*cov_ensemble**0.5)*np.exp(-0.5/cov_ensemble*epsilon_squared)
-            # likelihood      = -(N/2)*np.log(2*np.pi)-0.5*np.log(det_cov)-0.5*epsilon.T@inv_cov@epsilon
-            # likelihood      = 1/((2*np.pi)**(N/2)*det_cov**0.5)*np.exp(-0.5*epsilon.T@inv_cov@epsilon)
-            # likelihood      = np.exp(-0.5/cov_ensemble*epsilon_squared)
-            likelihood = np.exp(np.sum(epsilon**2))
-            likelihoods[i]  = likelihood
-        return likelihoods
-
-    def log_likelihood2(self, MLE_params):
-        MLE_params = MLE_params.reshape(self.n_params,1)    # making the params into a column vector so that it can be used in matrix calculations
-        y = self.measurements
-        p = self.regression_matrix@MLE_params
-        N = y.size
-        epsilon = y-p
-        ensemble_cov = np.sum(np.exp(epsilon**2))/N
-        
-        likelihood = 0.5/ensemble_cov*epsilon.T@epsilon + N/2*np.log(ensemble_cov)
-        # likelihood = np.sum(np.exp(epsilon**2))
-        # if self.trigger:
-        #     self.MLE_ensemble_epsilon = epsilon
-        #     self.trigger = False
-        # else:
-        #     self.MLE_ensemble_epsilon = np.hstack((self.MLE_ensemble_epsilon, epsilon))
-        #     ensemble_shape = self.MLE_ensemble_epsilon.shape
-        #     if ensemble_shape[1] > ensemble_shape[0]:
-        #         self.MLE_ensemble_epsilon = self.MLE_ensemble_epsilon[:,1:]
-        #         ensemble_cov = self.MLE_ensemble_epsilon@self.MLE_ensemble_epsilon.T
-        #         ensemble_det = np.linalg.det(ensemble_cov)
-        #         likelihood = np.exp(epsilon.T@np.linalg.inv(ensemble_cov)@epsilon)
-
-        
-        return likelihood
-
-
-    def MLE_estimate(self):
+    def MLE_estimate(self, solver="ES"):
+        """
+        Performs a maximum likelihood estimation of the model parameters
+        """
         # covaraince is NxN, with N = number of measurements.
         # function to maximize:
         #  y = self.measurements
@@ -94,18 +48,88 @@ class model:
         # two possible errors:
         # 1. the log likelihood should be max(-np.log(2*np.pi)**(N/2)*np.linalg.det(cov)**0.5 - 0.5(y-p)@np.linal.inv(cov)@(y-p))
         # 2. the cov matrix should be MxM, M being number of params
-        g = 20
-        n = 100 # number of particles
-        A = self.regression_matrix
-        test = ES(fitness_function=self.log_likelihood2, num_dimensions=self.n_params, num_generations=200, num_offspring_per_individual=6)
-        print('\n\nrunning ES....\n\n')
-        self.MLE_params = test.run()
-        self.MLE_best = test.group_best_fit
-        self.MLE_y = A@self.MLE_params.reshape(self.n_params,1)
-        # self.MLE_RMSE = np.sqrt(np.sum((self.MLE_y - self.measurements)**2))
+        g    = 20
+        n    = 100                         # number of particles
+        A    = self.regression_matrix
 
-    def RLS_estimate(self, P0=1e6*np.eye(6)):
-        pass
+        if solver=="ES":
+            print(f'\nRunning Evolutionary Strategies to optimize the Maximum Likelihood...\n')
+            test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_generations=200, num_offspring_per_individual=6, verbose=False)
+            print(f'\nFinished Evolutionary Strategies Maximum Likelihood \n')
+            self.MLE_params = test.run().reshape(self.n_params,1)
+            self.MLE_best   = test.group_best_fit
+        elif solver=="scipy":
+            self.MLE_params = np.random.rand(self.n_params,1)
+            self.MLE_params = minimize(self.log_likelihood, self.MLE_params).x
+            self.MLE_best   = 1
+        else:
+            raise ValueError(f"Solver {solver} not recognized. Please choose either 'ES' or 'scipy'")
+        
+        self.MLE_y      = A@self.MLE_params.reshape(self.n_params,1)       
+        self.MLE_RMSE   = self.calc_RMSE(self.MLE_y, self.measurements)    # calculating the RMSE of the MLE estimate
+
+
+    def RLS_estimate(self):
+        """
+        Performs a recursive least squares estimation of the model parameters
+        """
+        RLS_params          = np.zeros((self.n_params,1))   # initializing the RLS parameters
+        P                   = np.eye(self.n_params)         # initializing the RLS covariance matrix
+        A                   = self.regression_matrix        # shorter names for readability
+        y                   = self.measurements             # shorter names for readability    
+        N                   = y.size                        # number of measurements
+
+        self.RLS_all_params = np.zeros((self.n_params,N))   # initializing the RLS parameters for all measurements
+
+        for i in range(N):
+            smol_a          = A[[i],:]                      
+            smol_y          = y[[i],:]
+            RLS_gain        = P@smol_a.T@np.linalg.inv(smol_a@P@smol_a.T+1)
+            RLS_params = RLS_params + RLS_gain@(smol_y - smol_a@RLS_params)
+            P               = (np.eye(self.n_params) - RLS_gain@smol_a)@P
+            self.RLS_all_params[:,[i]] = RLS_params
+
+            if self.verbose:
+                plt.figure(1)
+                plot_y = A@RLS_params
+                y_dots = y[:i+1,0]
+                x_dots = np.arange(i+1)
+                plt.scatter(x_dots, y_dots, label="Measurements", s=1, marker="x", alpha=0.6)
+                plt.plot(plot_y, label="RLS")
+                plt.grid()
+                plt.ylim(-150,150)
+                plt.pause(0.05)
+                plt.clf()
+
+        self.RLS_y      = A@RLS_params
+        self.RLS_cov    = P
+        self.RLS_params = RLS_params
+
+
+    def log_likelihood(self, MLE_params):
+        """
+        Calculates an augmented log likelihood of the model given the measurements and the model parameters
+        """
+        MLE_params = MLE_params.reshape(self.n_params,1)    # making the params into a column vector so that it can be used in matrix calculations
+        y = self.measurements
+        p = self.regression_matrix@MLE_params
+        N = y.size
+        epsilon = y-p
+        ensemble_cov = epsilon.T@epsilon/N
+        likelihood = 0.5/ensemble_cov*epsilon.T@epsilon + N/2*np.log(ensemble_cov) + 0.5*np.log(2*np.pi)
+        # likelihood = np.sum(epsilon**2)
+        # likelihood = np.sqrt(epsilon.T@epsilon)   
+        # likelihood = np.sqrt(np.sum(epsilon**2))
+        return likelihood
+
+
+    def calc_RMSE(self, model_y, measured_y):
+        """
+        Calculates the root mean squared error between the model output and the measured output
+        """
+        return np.sqrt(np.sum((model_y - measured_y)**2)/self.measurements.size)
+
+
 
 def rk4(fn, xin, uin, t):
     """
