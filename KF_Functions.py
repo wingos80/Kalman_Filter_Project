@@ -57,7 +57,7 @@ def rk4(fn, xin, uin, t):
     return t, xout
 
 
-def kf_finite_difference(dx, Ys, step_size=10):
+def kf_finite_difference(dx, Ys, step_size=10, central_difference=False):
     """
     Function that numerically differentiates the given Ys array along axis=1,
     using a finite difference method. The step size of the differentiator can
@@ -80,24 +80,37 @@ def kf_finite_difference(dx, Ys, step_size=10):
     # Initialize arrays to store derivatives
     first_derivative, second_derivative = np.zeros_like(Ys), np.zeros_like(Ys)
     
-    # First derivative
-    temp = (np.diff(Ys[:,:-step_size:step_size], n=1) + np.diff(Ys[:,step_size::step_size], n=1))/(2*step_size*dx)                  # array containing the first derivatives
-    temp = np.append(temp[:,0].reshape(Ys.shape[0],1), np.append(temp, temp[:,-1].reshape(Ys.shape[0],1), axis=1), axis=1)                                                # append the last column of the array to the end
-    temp2 = np.arange(0, Ys.shape[1])
+    if central_difference:
+        # First derivative
+        temp = (np.diff(Ys[:,:-step_size:step_size], n=1) + np.diff(Ys[:,step_size::step_size], n=1))/(2*step_size*dx)                  # array containing the first derivatives
+        temp = np.append(temp[:,0].reshape(Ys.shape[0],1), np.append(temp, temp[:,-1].reshape(Ys.shape[0],1), axis=1), axis=1)          # append the last column of the array to the end
+        temp2 = np.arange(0, Ys.shape[1])
 
-    # Interpolate the first derivative array to the original Ys array size
-    for i, val in enumerate(Ys):
-        first_derivative[i,:] = np.interp(temp2, temp2[::step_size], temp[i,:])
+        # Interpolate the first derivative array to the original Ys array size
+        for i, val in enumerate(Ys):
+            first_derivative[i,:] = np.interp(temp2, temp2[::step_size], temp[i,:])
 
-    # # Second derivative
-    temp = (np.diff(first_derivative[:,:-step_size:step_size], n=1) + np.diff(first_derivative[:,step_size::step_size], n=1))/(2*step_size*dx)                  # array containing the first derivatives
-    temp[:,0] = temp[:,1]
-    temp[:,-1] = temp[:,-2]
-    temp = np.append(temp[:,0].reshape(Ys.shape[0],1), np.append(temp, temp[:,-1].reshape(Ys.shape[0],1), axis=1), axis=1)                                                # append the last column of the array to the end
+        # # Second derivative
+        temp = (np.diff(first_derivative[:,:-step_size:step_size], n=1) + np.diff(first_derivative[:,step_size::step_size], n=1))/(2*step_size*dx) # array containing the second derivatives
+        temp[:,0] = temp[:,1]
+        temp[:,-1] = temp[:,-2]
+        temp = np.append(temp[:,0].reshape(Ys.shape[0],1), np.append(temp, temp[:,-1].reshape(Ys.shape[0],1), axis=1), axis=1)           # append the last column of the array to the end
 
-    # Interpolate the first derivative array to the original Ys array size
-    for i, val in enumerate(Ys):
-        second_derivative[i,:] = np.interp(temp2, temp2[::step_size], temp[i,:])
+        # Interpolate the first derivative array to the original Ys array size
+        for i, val in enumerate(Ys):
+            second_derivative[i,:] = np.interp(temp2, temp2[::step_size], temp[i,:])
+    else:
+        # First derivative
+        Ys_shifted = np.roll(Ys, step_size, axis=1)
+        for i in range(step_size):
+            Ys_shifted[:, i] = Ys_shifted[:, step_size]        # zero order hold
+        first_derivative = (Ys - Ys_shifted)/(step_size*dx)
+
+        # Second derivative
+        Ys_shifted = np.roll(first_derivative, step_size, axis=1)
+        for i in range(step_size):
+            Ys_shifted[:, i] = Ys_shifted[:, step_size]        # zero order hold
+        second_derivative = (first_derivative - Ys_shifted)/(step_size*dx)
 
     return first_derivative, second_derivative
 
@@ -172,10 +185,8 @@ def kf_calc_f(t, X, U):
     Parameters
     ----------
     t : float
-    
     X : numpy.ndarray (n,1)
         state vector, X = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz, lambdax, lambday, lambdaz, lambdap, lambdaq, lambdar]^T
-        
     U : numpy.ndarray (m,1)
         input vector, U = [Ax, Ay, Az, p, q, r]^T
         
@@ -219,7 +230,7 @@ def kf_calc_f(t, X, U):
 
 def kf_calc_Fx(t, X, U):
     """
-    Calculates the Jacobian of the system dynamics equation,
+    Calculates the Jacobian of the system dynamics equation wrt the state vector,
     n (=18) is number of states.
     
     Parameters
@@ -324,6 +335,23 @@ def kf_calc_Fx(t, X, U):
         
 
 def kf_calc_Fu(t, X, U):
+    """
+    Calculate the Jacobian matrix of the system dynamics wrt the
+    input vector U.    
+    Parameters
+    ----------
+    t : float
+        Time at which to calculate the Jacobian matrix.
+    X : array_like
+        State vector at which to calculate the Jacobian matrix.
+    U : array_like
+        Input vector at which to calculate the Jacobian matrix.
+    Returns
+    -------
+    DFu : array_like
+        Jacobian matrix of the system dynamics with respect to the input vector
+        U.
+    """
     
     n = X.size
     nu = U.size
@@ -380,10 +408,8 @@ def kf_calc_h(t, X, U):
     Parameters
     ----------
     t : float
-    
     X : numpy.ndarray (n,1)
         state vector, X = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz, lambdax, lambday, lambdaz, lambdap, lambdaq, lambdar]^T
-        
     U : numpy.ndarray (m,1)
         input vector, U = [Ax, Ay, Az, p, q, r]^T
         
@@ -429,16 +455,14 @@ def kf_calc_h(t, X, U):
 
 def kf_calc_Hx(t, X, U):
     """
-    Calculates the Jacobian of the output dynamics equation, 
+    Calculates the Jacobian of the output dynamics equation wrt the states, 
     n (=18) is number of states, nm (=12) is number of outputs.
 
     Parameters
     ----------
     t : float
-    
     X : numpy.ndarray (n,1)
         state vector, X = [x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz, lambdax, lambday, lambdaz, lambdap, lambdaq, lambdar]^T
-        
     U : numpy.ndarray (m,1)
         input vector, U = [Ax, Ay, Az, p, q, r]^T
         
@@ -577,8 +601,9 @@ class model:
         self.OLS_cov = np.linalg.inv(A.T@A)
         self.OLS_params = self.OLS_cov@A.T@self.measurements
 
-        self.OLS_y = (A@self.OLS_params)
+        self.OLS_y    = (A@self.OLS_params)
         self.OLS_RMSE = self.calc_RMSE(self.OLS_y, self.measurements)  # calculating the RMSE of the OLS estimate
+        self.OLS_R2   = self.calc_R2(self.OLS_y, self.measurements)      # calculating the R2 of the OLS estimate
         if self.verbose: print(f'Finished OLS\n')
 
 
@@ -590,24 +615,35 @@ class model:
         g    = 20
         n    = 100                         # number of particles
         A    = self.regression_matrix
-
+        self.H = A@np.linalg.inv(A.T@A)@A.T
         if solver=="ES":
             if self.verbose: print(f'\n    Running Evolutionary Strategies to optimize the Maximum Likelihood...')
             test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_generations=200, num_offspring_per_individual=6, verbose=False)
             self.MLE_params = test.run().reshape(self.n_params,1)
             self.MLE_best   = test.group_best_fit
             if self.verbose: print(f'    Finished Evolutionary Strategies Maximum Likelihood \n')
+
         elif solver=="scipy":
             if self.verbose: print(f'\n    Running Scipy to optimize the Maximum Likelihood...')
             self.MLE_params = np.random.rand(self.n_params,1)
-            self.MLE_params = minimize(self.log_likelihood, self.MLE_params).x
+            self.MLE_params = minimize(self.log_likelihood, self.MLE_params).x.reshape(self.n_params,1)    
             self.MLE_best   = 1
             if self.verbose: print(f'    Finished Scipy Maximum Likelihood \n')
+            
+        elif solver=="combo":
+            # Running ES first to optimize to a local area, then using anlaytical methods from Scipy to converge to local optimum
+            if self.verbose: print(f'\n    Running Evolutionary Strategies + Scipy to optimize the Maximum Likelihood...')
+            test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_generations=200, num_offspring_per_individual=6, verbose=False)
+            self.MLE_params = test.run().reshape(self.n_params,1)
+            self.MLE_params = minimize(self.log_likelihood, self.MLE_params).x.reshape(self.n_params,1)    
+            self.MLE_best   = test.group_best_fit
+            if self.verbose: print(f'    Finished Evolutionary Strategies + Scipy Maximum Likelihood \n')
         else:
             raise ValueError(f"\n    Solver {solver} not recognized. Please choose either 'ES' or 'scipy'\n")
         
-        self.MLE_y      = A@self.MLE_params.reshape(self.n_params,1)       
+        self.MLE_y      = A@self.MLE_params   
         self.MLE_RMSE   = self.calc_RMSE(self.MLE_y, self.measurements)    # calculating the RMSE of the MLE estimate
+        self.MLE_R2     = self.calc_R2(self.MLE_y, self.measurements)      # calculating the R2 of the MLE estimate
         if self.verbose: print(f'Finished MLE\n')
 
 
@@ -647,7 +683,8 @@ class model:
         self.RLS_y      = A@RLS_params
         self.RLS_cov    = P
         self.RLS_params = RLS_params
-        self.RLS_RMSE = self.calc_RMSE(self.RLS_y, self.measurements)    # calculating the RMSE of the RLS estimate
+        self.RLS_RMSE   = self.calc_RMSE(self.RLS_y, self.measurements)    # calculating the RMSE of the RLS estimate
+        self.RLS_R2     = self.calc_R2(self.RLS_y, self.measurements)      # calculating the R2 of the RLS estimate
         if self.verbose: print(f'Finished RLS\n')
 
 
@@ -665,17 +702,28 @@ class model:
         # 1. the log likelihood should be max(-np.log(2*np.pi)**(N/2)*np.linalg.det(cov)**0.5 - 0.5(y-p)@np.linal.inv(cov)@(y-p))
         # 2. the cov matrix should be MxM, M being number of params
         MLE_params = MLE_params.reshape(self.n_params,1)    # making the params into a column vector so that it can be used in matrix calculations
+        A = self.regression_matrix
         y = self.measurements
-        p = self.regression_matrix@MLE_params
+        p = A@MLE_params
         N = y.size
         epsilon = y-p
-        ensemble_cov = epsilon.T@epsilon/N
+
+        # cov = np.eye(N) - self.H
+        likelihood = epsilon.T@epsilon
+
         # likelihood = 0.5/ensemble_cov*epsilon.T@epsilon + N/2*np.log(ensemble_cov) + 0.5*np.log(2*np.pi)
-        likelihood = np.sum(epsilon**2)
+        # likelihood = np.prod(epsilon**2)
         # likelihood = np.sqrt(epsilon.T@epsilon)   
         # likelihood = np.sqrt(np.sum(epsilon**2))
         return likelihood
 
+
+    def calc_R2(self, model_y, measured_y):
+        """
+        Calculates the R2 value between the model output and the measured output
+        """
+        return 1 - np.sum((model_y - measured_y)**2)/np.sum((measured_y - np.mean(measured_y))**2)
+    
 
     def calc_RMSE(self, model_y, measured_y):
         """

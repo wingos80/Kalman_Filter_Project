@@ -65,7 +65,7 @@ for filename in files:
     m               = 6                          # input dimension (not used)
     dt              = 0.01                       # time step [s]
     num_samples     = len(U[0])                  # number of samples
-    epsilon         = 10**(-18)                  # IEKF threshold
+    epsilon         = 10**(-17)                  # IEKF threshold
     maxIterations   = 600                        # maximum amount of iterations per sample
 
     ########################################################################
@@ -312,7 +312,7 @@ for filename in files:
     make_plots(x, [ys], f'{figs_destination} Iterations taken by IEKF', r'Time $[s]$', [r'Iterations'], save=printfigs)
 
     ys = {'innovation': [kalman_filter.innovations[0], 1.0]}
-    make_plots(x, [ys], f'{figs_destination} innovation', r'Time $[s]$', [r'Total Innovation'], save=printfigs)
+    make_plots(x, [ys], f'{figs_destination} innovation', r'Time $[s]$', [r'Total Innovation'], save=printfigs, log=0)
 
     if show_plot:
         plt.show()

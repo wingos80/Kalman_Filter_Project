@@ -2,7 +2,7 @@ import timeit
 from scipy.spatial import ConvexHull
 import numpy as np
 import matplotlib.pyplot as plt
-np.random.seed(1)
+# np.random.seed(1)
 pts = 5
 
 class Differential_Evolution:
@@ -216,8 +216,8 @@ class Individual:
 
 class ES:
     def __init__(self, fitness_function=lambda x: 0, num_dimensions=3, 
-                 num_generations=200, num_individuals=80, 
-                 num_offspring_per_individual=5, verbose=False):
+                 num_generations=200, num_individuals=100, 
+                 num_offspring_per_individual=6, verbose=False):
         self.fitness_function = fitness_function
         self.num_dimensions = num_dimensions
         self.num_generations = num_generations
@@ -271,8 +271,8 @@ class ES:
             selection = []
             selection_pool = population.copy()  
             pool_fitness = np.array([self.fitness_function(individual.genotype) for individual in population])
-            tournament_size = 14
-            for i in range(self.num_individuals):
+            tournament_size = 10
+            for _ in range(self.num_individuals):
                 # print(f'shape of selection pool and fitness: {selection_pool.shape}, {pool_fitness.shape}')
                 match = np.random.choice(np.arange(0,int(len(selection_pool))), tournament_size, replace=False)
                 match_fitness = [pool_fitness[j] for j in match]
@@ -313,7 +313,7 @@ class ES:
         # - For the genotype, sample a standard random normal distribution for each variable separately
         # - For the strategy parameter, sample a standard random normal distribution and then take the maximum of that sample and 0.1 
         #   (to ensure it is not negative and not too small for exploration)
-        return Individual(np.array([np.random.normal(0,1) for _ in range(self.num_dimensions)]), np.array([max(np.random.normal(0,5), 0.1) for _ in range(self.num_dimensions)]))
+        return Individual(np.array([np.random.normal(0,10) for _ in range(self.num_dimensions)]), np.array([max(np.random.normal(0,5), 0.5) for _ in range(self.num_dimensions)]))
 
 
 def ewma(s_prev, x, rho, i):

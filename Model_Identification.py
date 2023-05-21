@@ -60,6 +60,7 @@ for i, filename in enumerate(files):
 
     # Change the current working directory to the data folder and process all original csv files
     train_data = genfromtxt("data/filtered/normal/" + filename, delimiter=',').T
+    # train_data = train_data[:,1:]
     train_data = train_data[:, lb:ub]
 
     Xs_k       = train_data[:9,:]                   # retreiving x,y,z,u,v,w,phi,theta,psi
@@ -70,6 +71,7 @@ for i, filename in enumerate(files):
     dt = 0.01
 
     train_data = genfromtxt("data/regenerated/noise/" + filename.replace("filtered", "measurements"), delimiter=',').T
+    # train_data = train_data[:,1:]
     train_data = train_data[:, lb:ub]
     IMU          = train_data[15:21]                 # These are the IMU measurements
 
@@ -90,7 +92,13 @@ for i, filename in enumerate(files):
     ang_rate_X, ang_accel_X = kf_finite_difference(dt, Xs_k[6:9])                # finding derivative of the flight angles
 
     # finding the aircraft accelerations by calculating the first derivatives of the velocities using finite difference
-    vel_rate_X, _ = kf_finite_difference(dt, Xs_k[3:6])                          # finding derivative of the flight velocities
+    vel_rate_X, _ = kf_finite_difference(dt, Xs_k[3:6], step_size=10)                          # finding derivative of the flight velocities
+
+    plt.figure()
+    plt.plot(vel_rate_X[0,:], label="no central difference")
+    plt.legend()
+    plt.grid()
+    plt.show()
 
     FCs_k = kf_calc_Fc(mass, rho, S, Vs_k, vel_rate_X)                           # calculating the Fc values
     MCs_k = kf_calc_Mc(rho, b, c, S, I, Vs_k, ang_rate_X, ang_accel_X)           # calculating the Mc values
@@ -116,35 +124,41 @@ for i, filename in enumerate(files):
     Tc                = U_k[4,:]
     consts            = np.ones_like(alphas_k)
     
-    CX_model = model(np.array([consts, alphas_k, alphas_k**2, qs_k*c/Vinf, de, Tc]).T,    name="CX model")
+    CX_model = model(np.array([consts, betas_k, betas_k**2, alphas_k, alphas_k**2, alphas_k**3, qs_k*c/Vs_k, (qs_k*c/Vs_k)**2, de, Tc]).T,    name="CX model bigger")
+    CX_model = model(np.array([consts, alphas_k, alphas_k**2, qs_k*c/Vs_k, de, Tc]).T,    name="CX model")
     CX_model.measurements = FCs_k[0].reshape(N,1)
 
-    CY_model = model(np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr]).T, name="CY model")
+    CY_model = model(np.array([consts, betas_k, betas_k**2, ps_k*b/2/Vs_k, (ps_k*b/2/Vs_k)**2, rs_k*b/2/Vs_k, (rs_k*b/2/Vs_k)**2, da, dr]).T, name="CY model bigger")
+    CY_model = model(np.array([consts, betas_k, ps_k*b/2/Vs_k, rs_k*b/2/Vs_k, da, dr]).T, name="CY model")
     CY_model.measurements = FCs_k[1].reshape(N,1)
     
-    CZ_model = model(np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc]).T,                 name="CY model")
+    CZ_model = model(np.array([consts, alphas_k, alphas_k**2, qs_k*c/Vs_k, (qs_k*c/Vs_k)**2, de, Tc]).T,                                      name="CZ model bigger")
+    CZ_model = model(np.array([consts, alphas_k, qs_k*c/Vs_k, de, Tc]).T,                 name="CY model")
     CZ_model.measurements = FCs_k[2].reshape(N,1)
 
-    Cl_model = model(np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr]).T, name="Cl model")
+    Cl_model = model(np.array([consts, betas_k, betas_k**2, ps_k*b/2/Vs_k, (ps_k*b/2/Vs_k)**2, rs_k*b/2/Vs_k, (rs_k*b/2/Vs_k)**2, da, dr]).T, name="Cl model bigger")
+    Cl_model = model(np.array([consts, betas_k, ps_k*b/2/Vs_k, rs_k*b/2/Vs_k, da, dr]).T, name="Cl model")
     Cl_model.measurements = MCs_k[0].reshape(N,1)
 
-    Cm_model = model(np.array([consts, alphas_k, qs_k*c/Vinf, de, Tc]).T,                 name="Cm model")
+    Cm_model = model(np.array([consts, alphas_k, alphas_k**2, qs_k*c/Vs_k, (qs_k*c/Vs_k)**2, de, Tc]).T,                                      name="Cm model bigger")
+    Cm_model = model(np.array([consts, alphas_k, qs_k*c/Vs_k, de, Tc]).T,                 name="Cm model")
     Cm_model.measurements = MCs_k[1].reshape(N,1)
 
-    Cn_model = model(np.array([consts, betas_k, ps_k*b/2/Vinf, rs_k*b/2/Vinf, da, dr]).T, name="Cn model")
+    Cn_model = model(np.array([consts, betas_k, betas_k**2, ps_k*b/2/Vs_k, (ps_k*b/2/Vs_k)**2, rs_k*b/2/Vs_k, (rs_k*b/2/Vs_k)**2, da, dr]).T, name="Cn model bigger")
+    Cn_model = model(np.array([consts, betas_k, ps_k*b/2/Vs_k, rs_k*b/2/Vs_k, da, dr]).T, name="Cn model")
     Cn_model.measurements = MCs_k[2].reshape(N,1)
 
     models = [CX_model]
 
     for model_k in models:
-        model_k.verbose = True
+        # model_k.verbose = True
         model_k.OLS_estimate()
-        model_k.MLE_estimate()
+        model_k.MLE_estimate(solver='combo')
         # model_k.RLS_estimate()
 
-        print(f'{model_k.name} OLS params: {model_k.OLS_params} (RMSE: {model_k.OLS_RMSE})')
-        print(f'{model_k.name} MLE params: {model_k.MLE_params} (RMSE: {model_k.MLE_RMSE})')
-        # print(f'{model_k.name} RLS params: {model_k.RLS_params} (RMSE: {model_k.RLS_RMSE})')
+        print(f'{model_k.name} OLS params: {model_k.OLS_params} (RMSE, R2: {model_k.OLS_RMSE}, {model_k.OLS_R2})')
+        print(f'{model_k.name} MLE params: {model_k.MLE_params} (RMSE, R2: {model_k.MLE_RMSE}, {model_k.MLE_R2})')
+        # print(f'{model_k.name} RLS params: {model_k.RLS_params} (RMSE, R2: {model_k.RLS_RMSE}, {model_k.RLS_R2})')
 
     if FCs is None:
         FCs, MCs, Xs, U, Vs, alphas, betas = FCs_k, MCs_k, Xs_k, U_k, Vs_k, alphas_k, betas_k
