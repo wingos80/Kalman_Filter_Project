@@ -589,7 +589,7 @@ class model:
         self.n_params          = self.regression_matrix.shape[1]
         self.measurements      = None    # the measurements of size nx1
         self.verbose           = verbose
-        self.trigger           = True
+        self.trigger           = 0
 
 
     def OLS_estimate(self):
@@ -616,6 +616,9 @@ class model:
         n    = 100                         # number of particles
         A    = self.regression_matrix
         self.H = A@np.linalg.inv(A.T@A)@A.T
+
+        N = self.measurements.size
+        self.ensemble_cov = np.zeros((N, N))
         if solver=="ES":
             if self.verbose: print(f'\n    Running Evolutionary Strategies to optimize the Maximum Likelihood...')
             test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_generations=200, num_offspring_per_individual=6, verbose=False)
@@ -707,9 +710,15 @@ class model:
         p = A@MLE_params
         N = y.size
         epsilon = y-p
-
+        self.ensemble_cov += epsilon@epsilon.T
+        self.trigger           +=1
+        if self.trigger < 2*self.n_params:
+            ensemble_cov = np.eye(N)
+        else:
+            ensemble_cov = self.ensemble_cov/self.trigger
+            
         # cov = np.eye(N) - self.H
-        likelihood = epsilon.T@epsilon
+        likelihood = -epsilon.T@ensemble_cov@epsilon
 
         # likelihood = 0.5/ensemble_cov*epsilon.T@epsilon + N/2*np.log(ensemble_cov) + 0.5*np.log(2*np.pi)
         # likelihood = np.prod(epsilon**2)

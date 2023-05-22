@@ -267,8 +267,8 @@ class IEKF:
         H_j = self.H_jacobian
 
         # P(k|k) (correction) using the numerically stable form of P_k_1k_1 = (eye(n) - K*Hx) * P_kk_1 
-        self.P_k1_k1 = (self.eye_n - K@H_j)@self.P_k1_k
-        # self.P_k1_k1          = (self.eye_n - K@H_j)@self.P_k1_k@(self.eye_n - K@H_j).transpose() + K@self.R@K.transpose()    
+        # self.P_k1_k1 = (self.eye_n - K@H_j)@self.P_k1_k
+        self.P_k1_k1          = (self.eye_n - K@H_j)@self.P_k1_k@(self.eye_n - K@H_j).transpose() + K@self.R@K.transpose()    
         self.std_x_cor   = np.sqrt(self.P_k1_k1.diagonal())        # standard deviation of state estimation error (for validation)
 
         # calculate the kalman filter 'innovation', difference in measured and predicted observation

@@ -292,8 +292,8 @@ class ES:
             best                = itr_best if self.itr_best_fit < self.group_best_fit else best
             self.group_best_fit = self.itr_best_fit if self.itr_best_fit < self.group_best_fit else self.group_best_fit
 
-            # if self.terminate():
-            #     break
+            if self.terminate():
+                break
             if self.verbose:
                 plt.figure(1)
                 y = itr_best.genotype[0] + itr_best.genotype[1]*x + itr_best.genotype[2]*x**2 + itr_best.genotype[3]*x**3 + itr_best.genotype[4]*x**4

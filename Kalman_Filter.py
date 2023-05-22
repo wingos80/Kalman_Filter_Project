@@ -21,9 +21,9 @@ sns.set(style = "darkgrid")                  # Set seaborn style
 ########################################################################
 ## Start writing measurements to csv files
 ########################################################################
-save      = False             # enable saving data
-show_plot = True            # enable plotting
-printfigs = False             # enable saving figures
+save      = True             # enable saving data
+show_plot = False            # enable plotting
+printfigs = True             # enable saving figures
 
 all_results_file = open("data/all_results.csv", "w")
 all_results_file.write(f"x_kf, y_kf, z_kf, u_kf, v_kf, w_kf, phi_kf, theta_kf, psi_kf, Wx_kf, Wy_kf, Wz_kf, Lx_kf, Ly_kf, Lz_kf, Lp_kf, Lq_kf, Lr_kf, da, de, dr, Tc1, Tc2, V, alpha, beta\n")
@@ -34,7 +34,7 @@ files = os.listdir(os.getcwd())
 os.chdir("../../..")
 
 time1 = time.time()
-files = ['de3211_1_measurements.csv']
+# files = ['de3211_1_measurements.csv']
 for filename in files:
     print(f"\n\nFiltering data for {filename}...\n\n")
     ########################################################################
@@ -76,9 +76,9 @@ for filename in files:
     ##     input vector, U = [Ax, Ay, Az, p, q, r]^T
     ########################################################################
     E_x_0       = np.zeros([18,1])                                                                            # initial estimate of x_k1_k1
-    E_x_0[3:9]  = Z[3:9, 0].reshape(6,1)                                                                      # initial estimate of velocity and flight angles
-    E_x_0[9:12] = np.array([[2], [-8], [1]])                                                                  # initial estimate of Wind velocities
-    E_x_0[12:]  = np.array([[0.02], [0.02], [0.02], [0.003*np.pi/180], [0.003*np.pi/180], [0.003*np.pi/180]]) # initial estimate of lambda (biases), angular biases in radians
+    # E_x_0[3:9]  = Z[3:9, 0].reshape(6,1)                                                                      # initial estimate of velocity and flight angles
+    # E_x_0[9:12] = np.array([[2], [-8], [1]])                                                                  # initial estimate of Wind velocities
+    # E_x_0[12:]  = np.array([[0.02], [0.02], [0.02], [0.003*np.pi/180], [0.003*np.pi/180], [0.003*np.pi/180]]) # initial estimate of lambda (biases), angular biases in radians
     B           = np.zeros([18,6])                                                                            # input matrix
 
     # Initial state standard deviation estimates
@@ -242,22 +242,22 @@ for filename in files:
             r'kf u':  [Zs[3], 1.0],
             r'kf v':  [Zs[4], 1.0],
             r'kf w':  [Zs[5], 1.0],}
-    make_plots(x, [ys], f'{figs_destination} raw and kalman-filtered navigation velocities', r'Time $[s]$', [r'body velocities $[m/s]$'], save=printfigs, colors=colors)
+    make_plots(x, [ys], f'{figs_destination} raw and kalman-filtered navigation velocities', r'Time $[s]$', [r'Nav velocities $[m/s]$'], save=printfigs, colors=colors)
 
     ys = {r'raw x': [Z[0], 0.3],
         r'raw y': [Z[1], 0.3],
         r'raw z': [Z[2], 0.3],
-        r'KF x':  [Xs[0], 1.0],
-        r'KF y':  [Xs[1], 1.0],
-        r'KF z':  [Xs[2], 1.0]}
+        r'kf x':  [Xs[0], 1.0],
+        r'kf y':  [Xs[1], 1.0],
+        r'kf z':  [Xs[2], 1.0]}
     ys2 = {r'$\sigma^2(x)$': [kalman_filter.PP_k1_k1[0], 1.0],
         r'$\sigma^2(y)$': [kalman_filter.PP_k1_k1[1], 1.0],
         r'$\sigma^2(z)$': [kalman_filter.PP_k1_k1[2], 1.0]}
     make_plots(x, [ys, ys2], f'{figs_destination} raw and kalman-filtered positions', r'Time $[s]$', [r'$x [m]$', r'$x^2 [m^2]$'], colors=colors, save=printfigs, log=1)
 
-    ys     = {r'body u':  [Xs[3], 1.0],
-            r'body v':  [Xs[4], 1.0],
-            r'body w':  [Xs[5], 1.0],}
+    ys     = {r'kf body u':  [Xs[3], 1.0],
+            r'kf body v':  [Xs[4], 1.0],
+            r'kf body w':  [Xs[5], 1.0],}
     ys2 = {r'$\sigma^2(u)$': [kalman_filter.PP_k1_k1[3], 1.0],
         r'$\sigma^2(v)$': [kalman_filter.PP_k1_k1[4], 1.0],
         r'$\sigma^2(w)$': [kalman_filter.PP_k1_k1[5], 1.0]}
