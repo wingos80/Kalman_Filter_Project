@@ -50,7 +50,7 @@ maneuver  = [(19, 40), (10, 15), (19.5, 30), (9.5, 15), (19.5, 29), (19.5, 29)] 
 os.chdir("data/filtered/a/")
 files = os.listdir(os.getcwd())
 os.chdir("../../..")
-
+files = ["da3211_2_filtered.csv"]
 for i, filename in enumerate(files):
     print(f"\n\nProcessing data for {filename}...\n\n")
     lb ,ub = int(maneuver[i][0]/dt), int(maneuver[i][1]/dt)
@@ -92,7 +92,7 @@ for i, filename in enumerate(files):
     ang_rate_X, ang_accel_X = kf_finite_difference(dt, Xs_k[6:9])                # finding derivative of the flight angles
 
     # finding the aircraft accelerations by calculating the first derivatives of the velocities using finite difference
-    vel_rate_X, _ = kf_finite_difference(dt, Xs_k[3:6], step_size=10)                          # finding derivative of the flight velocities
+    vel_rate_X, _ = kf_finite_difference(dt, Xs_k[3:6], step_size=20)                          # finding derivative of the flight velocities
 
     plt.figure()
     plt.plot(vel_rate_X[0,:], label="no central difference")
@@ -117,6 +117,22 @@ for i, filename in enumerate(files):
     """
     ########################################################################
     # Construct the datapoints in the solution space
+    # train_data = genfromtxt("data/regenerated/no_noise/" + filename, delimiter=',').T
+    # train_data = train_data[:, lb:ub]
+    # N = train_data.shape[1]
+
+    # alphas_k, betas_k = train_data[28,:], train_data[29,:]
+    # ps_k, qs_k, rs_k  = train_data[18,:], train_data[19,:] , train_data[20,:]
+    # Vinf              = train_data[12,:]
+    # da, de, dr        = train_data[21,:], train_data[22,:], train_data[23,:]
+    # Tc                = train_data[24,:]
+    # consts            = np.ones_like(alphas_k)
+    # Vs_k = Vinf
+    # vel_rate_X        = train_data[15:28,:]
+    # ang_rate_X        = train_data[18:21,:]
+    # ang_accel_X, _    = kf_finite_difference(dt, ang_rate_X, step_size=10)
+    # FCs_k = kf_calc_Fc(mass, rho, S, Vinf, vel_rate_X)                           # calculating the Fc values
+    # MCs_k = kf_calc_Mc(rho, b, c, S, I, Vinf, ang_rate_X, ang_accel_X)           # calculating the Mc values
     alphas_k, betas_k = alphas_k, betas_k
     ps_k, qs_k, rs_k  = ang_rate_X[0,:], ang_rate_X[1,:], ang_rate_X[2,:]
     Vinf              = Vs_k[0]
@@ -153,27 +169,27 @@ for i, filename in enumerate(files):
     for model_k in models:
         # model_k.verbose = True
         model_k.OLS_estimate()
-        model_k.MLE_estimate(solver='combo')
+        # model_k.MLE_estimate(solver='combo')
         # model_k.RLS_estimate()
 
         print(f'{model_k.name} OLS params: {model_k.OLS_params} (RMSE, R2: {model_k.OLS_RMSE}, {model_k.OLS_R2})')
-        print(f'{model_k.name} MLE params: {model_k.MLE_params} (RMSE, R2: {model_k.MLE_RMSE}, {model_k.MLE_R2})')
+        # print(f'{model_k.name} MLE params: {model_k.MLE_params} (RMSE, R2: {model_k.MLE_RMSE}, {model_k.MLE_R2})')
         # print(f'{model_k.name} RLS params: {model_k.RLS_params} (RMSE, R2: {model_k.RLS_RMSE}, {model_k.RLS_R2})')
 
-    if FCs is None:
-        FCs, MCs, Xs, U, Vs, alphas, betas = FCs_k, MCs_k, Xs_k, U_k, Vs_k, alphas_k, betas_k
-    else:
-        FCs = np.concatenate((FCs, FCs_k), axis=1)
-        MCs = np.concatenate((MCs, MCs_k), axis=1)
-        Xs = np.concatenate((Xs, Xs_k), axis=1)
-        U = np.concatenate((U, U_k), axis=1)
-        Vs = np.concatenate((Vs, Vs_k), axis=0)
-        alphas = np.concatenate((alphas, alphas_k), axis=0)
-        betas = np.concatenate((betas, betas_k), axis=0)    
+    # if FCs is None:
+    #     FCs, MCs, Xs, U, Vs, alphas, betas = FCs_k, MCs_k, Xs_k, U_k, Vs_k, alphas_k, betas_k
+    # else:
+    #     FCs = np.concatenate((FCs, FCs_k), axis=1)
+    #     MCs = np.concatenate((MCs, MCs_k), axis=1)
+    #     Xs = np.concatenate((Xs, Xs_k), axis=1)
+    #     U = np.concatenate((U, U_k), axis=1)
+    #     Vs = np.concatenate((Vs, Vs_k), axis=0)
+    #     alphas = np.concatenate((alphas, alphas_k), axis=0)
+    #     betas = np.concatenate((betas, betas_k), axis=0)    
     ########################################################################
     ## Plotting some results for visualization
     ########################################################################
-    x = dt*np.arange(0, Xs_k.shape[1], 1)
+    x = dt*np.arange(0, N, 1)
 
     # ys = {r'$\dot{p}$': [ang_accel_X[0,:], 0.8],
     #       r'$\dot{q}$': [ang_accel_X[1,:], 0.8],

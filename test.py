@@ -20,7 +20,7 @@ MLE_SCI = 0
 
 plt.figure()
 for i in range(n):
-    y_noise = y+np.random.normal(0,2,y.size)
+    y_noise = y+np.random.normal(0,1,y.size)
 
     f_model = model(np.array([np.ones_like(x), x, x**2, x**3]).T,verbose=True)
     f_model.measurements = y_noise.reshape(y_noise.size,1)
@@ -29,6 +29,7 @@ for i in range(n):
     # print(f'scipy mle params: {f_model.MLE_params}')
     # plt.plot(x,f_model.MLE_y, label='MLE estimate scipy')
     # MLE_SCI += np.sqrt(np.sum((f_model.MLE_y.flatten()-y)**2))
+
     f_model.MLE_estimate(solver="ES")
     print(f'ES mle params: {f_model.MLE_params}')
     plt.plot(x,f_model.MLE_y, label='MLE estimate ES')
@@ -42,25 +43,25 @@ for i in range(n):
     # MLE_RMSE += np.sqrt(np.sum((f_model.MLE_y.flatten()-y)**2))
     # RLS_RMSE += np.sqrt(np.sum((f_model.RLS_y.flatten()-y)**2))
 
-print(f'average OLS RMSE, R2: {OLS_RMSE/n}, {f_model.OLS_R2}')
-# print(f'average MLE RMSE, R2: {MLE_RMSE/n}, {f_model.MLE_R2}')
-# print(f'average RLS RMSE, R2: {RLS_RMSE/n}, {f_model.RLS_R2}')
-print(f'average MLE ES RMSE: {MLE_ES/n}')
+# print(f'average OLS RMSE, R2: {OLS_RMSE/n}, {f_model.OLS_R2}')
+# # print(f'average MLE RMSE, R2: {MLE_RMSE/n}, {f_model.MLE_R2}')
+# # print(f'average RLS RMSE, R2: {RLS_RMSE/n}, {f_model.RLS_R2}')
+# # print(f'average MLE ES RMSE: {MLE_ES/n}')
 # print(f'average MLE SCI RMSE: {MLE_SCI/n}')
 
 # prob = f_model.log_likelihood2(np.array([[10,-3]]))
 
 # print('\n\nperfect fitness', prob)
 print('\n\nmle best fitness', f_model.MLE_best)
-# print('\n\nOLS params: ',f_model.OLS_params.flatten())
+print('\n\nOLS params: ',f_model.OLS_params.flatten())
 print('\n\nMLE params: ',f_model.MLE_params.flatten())
 # print('\n\nRLS params: ',f_model.RLS_params.flatten())
 
 print(f_model)
 
 # plt.plot(x,y, label='original function',alpha=0.4)
-plt.plot(x,f_model.OLS_y, label='OLS estimate')
-# plt.plot(x,f_model.MLE_y, label='MLE estimate')
+plt.plot(x,f_model.OLS_y, label='OLS estimate', alpha=0.7)
+plt.plot(x,f_model.MLE_y, label='MLE estimate', alpha=0.7)
 # plt.plot(x,f_model.RLS_y, label='RLS estimate')
 # plt.scatter(x,y,s=1.5,label='data points',marker='o')
 plt.scatter(x,y_noise, label='noisey function',alpha=0.4)

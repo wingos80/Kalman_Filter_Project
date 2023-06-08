@@ -22,7 +22,9 @@ sns.set(style = "darkgrid")                  # Set seaborn style
 ## Start writing measurements to csv files
 ########################################################################
 show_plot = False            # enable plotting
-save      = True             # enable saving data
+save      = False             # enable saving data
+save_plot = True            # enable saving plots
+file_dest = 'extra_noise/'
 
 alpha_t = 1.0
 alpha_n = 0.62
@@ -86,8 +88,8 @@ for filename in files:
 
     # ADS noise statistics
     std_ads_v = 0.1                                 # standard deviation of air data sensors true airspeed measurement noise
-    std_ads_alpha = 0.1*np.pi/180                   # standard deviation of air data sensors alpha measurement noise, in radians
-    std_ads_beta = 0.1*np.pi/180                    # standard deviation of air data sensors beta measurement noise, in radians
+    std_ads_alpha = 2*np.pi/180                   # standard deviation of air data sensors alpha measurement noise, in radians
+    std_ads_beta = 3.5*np.pi/180                    # standard deviation of air data sensors beta measurement noise, in radians
 
     stds_ads = [[std_ads_v],[std_ads_alpha],[std_ads_beta]]
 
@@ -134,7 +136,7 @@ for filename in files:
     w_n = w_n + Wz
     
     if save:
-        result_filename = 'data/regenerated/no_noise/' + filename.replace('.csv','_measurements.csv')
+        result_filename = 'data/regenerated/' + file_dest + filename.replace('.csv','_measurements.csv')
         result_file     = open(result_filename, "w")
 
         # writing the column headings in the resulte file, ADS stands for airdata sensors
@@ -164,7 +166,7 @@ for filename in files:
     ########################################################################
     ## Plotting results, and saving if desired
     ########################################################################
-    figs_destination = 'figs/raw_and_noise_figs/' + filename.replace('.csv', '')
+    figs_destination = 'figs/raw_and_noise_figs/' + file_dest + filename.replace('.csv', '')
 
     # Use 3D scatter plot to visualize the airplane position over time
     fig = plt.figure(num=f'{figs_destination}_true_vs_noise_xyz.pdf')
@@ -178,7 +180,7 @@ for filename in files:
     lgnd = plt.legend(scatterpoints=6, fontsize=10)
     plt.tight_layout()
     
-    if save:
+    if save_plot:
         plt.savefig(f'{figs_destination}_true_vs_noise_xyz.pdf')
     
     # 2d plots to visualize all system states and values over time
@@ -189,7 +191,7 @@ for filename in files:
         r'$\theta$ noise': [gps_t[7,:], alpha_n],
         r'$\psi$ true': [psi, alpha_t],
         r'$\psi$ noise': [gps_t[8,:], alpha_n]}
-    make_plots(x, [ys], f'{figs_destination} true vs noise angles', r'Time $[s]$', [r'angles $[rad]$'], save=save, colors=colors)
+    make_plots(x, [ys], f'{figs_destination} true vs noise angles', r'Time $[s]$', [r'angles $[rad]$'], save=save_plot, colors=colors)
 
     ys = {'u true': [u_n, alpha_t],
         'u noise': [gps_t[3,:], alpha_n],
@@ -197,7 +199,7 @@ for filename in files:
         'v noise': [gps_t[4,:], alpha_n],
         'w true': [w_n, alpha_t],
         'w noise': [gps_t[5,:], alpha_n]}
-    make_plots(x, [ys], f'{figs_destination} true vs noise velocities', r'Time $[s]$', [r'velocities $[m/s]$'], save=save, colors=colors)
+    make_plots(x, [ys], f'{figs_destination} true vs noise velocities', r'Time $[s]$', [r'velocities $[m/s]$'], save=save_plot, colors=colors)
 
     ys = {r'$A_x$ true': [ax, alpha_t],
             r'$A_x$ noise': [imu_t[0,:], alpha_n],
@@ -205,7 +207,7 @@ for filename in files:
             r'$A_y$ noise': [imu_t[1,:], alpha_n],
             r'$A_z$ true': [az, alpha_t],
             r'$A_z$ noise': [imu_t[2,:], alpha_n]}
-    make_plots(x, [ys], f'{figs_destination} true vs noise accelerations', r'Time $[s]$', [r'accelerations $[m/s^2]$'], save=save, colors=colors)
+    make_plots(x, [ys], f'{figs_destination} true vs noise accelerations', r'Time $[s]$', [r'accelerations $[m/s^2]$'], save=save_plot, colors=colors)
 
     ys = {'p true': [p, alpha_t],
             'p noise': [imu_t[3,:], alpha_n],
@@ -213,17 +215,17 @@ for filename in files:
             'q noise': [imu_t[4,:], alpha_n],
             'r true': [r, alpha_t],
             'r noise': [imu_t[5,:], alpha_n]}
-    make_plots(x, [ys], f'{figs_destination} true vs noise angular velocities', r'Time $[s]$', [r'angular velocities $[rad/s]$'], save=save, colors=colors)
+    make_plots(x, [ys], f'{figs_destination} true vs noise angular velocities', r'Time $[s]$', [r'angular velocities $[rad/s]$'], save=save_plot, colors=colors)
 
     ys = {r'$V_{TAS}$ true': [vtas, alpha_t],
             r'$V_{TAS}$ noise': [airdata_t[0,:], alpha_n]}
-    make_plots(x, [ys], f'{figs_destination} true vs noise Vtas', r'Time $[s]$', [r'$V_{tas} [rad]$'], save=save, colors=colors)
+    make_plots(x, [ys], f'{figs_destination} true vs noise Vtas', r'Time $[s]$', [r'$V_{tas} [rad]$'], save=save_plot, colors=colors)
 
     ys = {r'$\alpha$ true': [alpha, alpha_t],
             r'$\alpha$ noise': [airdata_t[1,:], alpha_n],
             r'$\beta$ true': [beta, alpha_t],
             r'$\beta$ noise': [airdata_t[2,:], alpha_n]}
-    make_plots(x, [ys], f'{figs_destination} true vs noise alpha and beta', r'Time $[s]$', [r'angles [rad]'], save=save, colors=colors)
+    make_plots(x, [ys], f'{figs_destination} true vs noise alpha and beta', r'Time $[s]$', [r'angles [rad]'], save=save_plot, colors=colors)
     
     ys = {'x true': [xyz[0,:], alpha_t],
             'x noise': [gps_t[0,:], alpha_n],
@@ -231,7 +233,7 @@ for filename in files:
             'y noise': [gps_t[1,:], alpha_n],
             'z true': [xyz[2,:], alpha_t],
             'z noise': [gps_t[2,:], alpha_n]}
-    make_plots(x, [ys], f'{figs_destination} true vs noise positions', r'Time $[s]$', [r'positions $[m]$'], save=save, colors=colors)
+    make_plots(x, [ys], f'{figs_destination} true vs noise positions', r'Time $[s]$', [r'positions $[m]$'], save=save_plot, colors=colors)
 
     if show_plot:
         plt.show()

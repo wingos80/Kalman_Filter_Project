@@ -21,20 +21,21 @@ sns.set(style = "darkgrid")                  # Set seaborn style
 ########################################################################
 ## Start writing measurements to csv files
 ########################################################################
-save      = True             # enable saving data
-show_plot = False            # enable plotting
-printfigs = True             # enable saving figures
+save      = False             # enable saving data
+show_plot = True              # enable plotting
+printfigs = False             # enable saving figures
+file_dest = 'noise/'
 
-all_results_file = open("data/all_results.csv", "w")
-all_results_file.write(f"x_kf, y_kf, z_kf, u_kf, v_kf, w_kf, phi_kf, theta_kf, psi_kf, Wx_kf, Wy_kf, Wz_kf, Lx_kf, Ly_kf, Lz_kf, Lp_kf, Lq_kf, Lr_kf, da, de, dr, Tc1, Tc2, V, alpha, beta\n")
+# all_results_file = open("data/all_results.csv", "w")
+# all_results_file.write(f"x_kf, y_kf, z_kf, u_kf, v_kf, w_kf, phi_kf, theta_kf, psi_kf, Wx_kf, Wy_kf, Wz_kf, Lx_kf, Ly_kf, Lz_kf, Lp_kf, Lq_kf, Lr_kf, da, de, dr, Tc1, Tc2, V, alpha, beta\n")
 
 # Change the current working directory to the data folder and process all original csv files
-os.chdir("data/regenerated/noise/")
+os.chdir("data/regenerated/" + file_dest)
 files = os.listdir(os.getcwd())
 os.chdir("../../..")
 
 time1 = time.time()
-# files = ['de3211_1_measurements.csv']
+files = ['de3211_1_measurements.csv']
 for filename in files:
     print(f"\n\nFiltering data for {filename}...\n\n")
     ########################################################################
@@ -42,7 +43,7 @@ for filename in files:
     ########################################################################
 
     # filename = 'data/de3211_1_measurements.csv'
-    train_data = genfromtxt('data/regenerated/noise/' + filename, delimiter=',').T
+    train_data = genfromtxt('data/regenerated/' + file_dest + filename, delimiter=',').T
     train_data = train_data[:, 1:]
 
     xyz        = train_data[0:3]                   # First 3 columns are the simulated xyz's 
@@ -66,7 +67,7 @@ for filename in files:
     dt              = 0.01                       # time step [s]
     num_samples     = len(U[0])                  # number of samples
     epsilon         = 10**(-17)                  # IEKF threshold
-    maxIterations   = 600                        # maximum amount of iterations per sample
+    maxIterations   = 500                        # maximum amount of iterations per sample
 
     ########################################################################
     ## Set initial values for states and statistics
@@ -113,8 +114,8 @@ for filename in files:
     std_gps_psi = std_gps_phi                       # standard deviation of GPS psi measurement noise, in radians
 
     std_ads_v = 0.1                                 # standard deviation of air data sensors true airspeed measurement noise
-    std_ads_alpha = 0.1*np.pi/180                   # standard deviation of air data sensors alpha measurement noise, in radians
-    std_ads_beta = 0.1*np.pi/180                    # standard deviation of air data sensors beta measurement noise, in radians
+    std_ads_alpha = 2*np.pi/180                   # standard deviation of air data sensors alpha measurement noise, in radians
+    std_ads_beta = 3.5*np.pi/180                    # standard deviation of air data sensors beta measurement noise, in radians
 
     # measurement noise estimates (noise of the Z signal)
     R_stds   = [std_gps_x, std_gps_y, std_gps_z, std_gps_u, std_gps_v, std_gps_w, std_gps_phi, std_gps_theta, std_gps_psi, std_ads_v, std_ads_alpha, std_ads_beta]
@@ -174,7 +175,7 @@ for filename in files:
     result_filename = filename.replace('measurements', 'filtered')
 
     if save:
-        result_file = open('data/filtered/normal/' + result_filename, "w")
+        result_file = open('data/filtered/' + file_dest + result_filename, "w")
 
         # writing the column headings in the results file
         result_file.write(f"x_kf, y_kf, z_kf, u_kf, v_kf, w_kf, phi_kf, theta_kf, psi_kf, Wx_kf, Wy_kf, Wz_kf, Lx_kf, Ly_kf, Lz_kf, Lp_kf, Lq_kf, Lr_kf, da, de, dr, Tc1, Tc2, V, alpha, beta\n")
@@ -182,7 +183,7 @@ for filename in files:
         # writing every entry of the kalman filter states to the result file
         for k in range(num_samples):
             result_file.write(f"{Xs[0,k]},{Xs[1,k]},{Xs[2,k]},{Xs[3,k]},{Xs[4,k]},{Xs[5,k]},{Xs[6,k]},{Xs[7,k]},{Xs[8,k]},{Xs[9,k]},{Xs[10,k]},{Xs[11,k]},{Xs[12,k]},{Xs[13,k]},{Xs[14,k]},{Xs[15,k]},{Xs[16,k]},{Xs[17,k]},{CTRLs[0,k]},{CTRLs[1,k]},{CTRLs[2,k]},{CTRLs[3,k]},{CTRLs[4,k]},{Z[9,k]},{Z[10,k]},{Z[11,k]}\n")
-            all_results_file.write(f"{Xs[0,k]},{Xs[1,k]},{Xs[2,k]},{Xs[3,k]},{Xs[4,k]},{Xs[5,k]},{Xs[6,k]},{Xs[7,k]},{Xs[8,k]},{Xs[9,k]},{Xs[10,k]},{Xs[11,k]},{Xs[12,k]},{Xs[13,k]},{Xs[14,k]},{Xs[15,k]},{Xs[16,k]},{Xs[17,k]},{CTRLs[0,k]},{CTRLs[1,k]},{CTRLs[2,k]},{CTRLs[3,k]},{CTRLs[4,k]},{Z[9,k]},{Z[10,k]},{Z[11,k]}\n")
+            # all_results_file.write(f"{Xs[0,k]},{Xs[1,k]},{Xs[2,k]},{Xs[3,k]},{Xs[4,k]},{Xs[5,k]},{Xs[6,k]},{Xs[7,k]},{Xs[8,k]},{Xs[9,k]},{Xs[10,k]},{Xs[11,k]},{Xs[12,k]},{Xs[13,k]},{Xs[14,k]},{Xs[15,k]},{Xs[16,k]},{Xs[17,k]},{CTRLs[0,k]},{CTRLs[1,k]},{CTRLs[2,k]},{CTRLs[3,k]},{CTRLs[4,k]},{Z[9,k]},{Z[10,k]},{Z[11,k]}\n")
         
         result_file.close()
 
@@ -190,7 +191,7 @@ for filename in files:
     ## Plotting all the filtered data and the kalman estimated values
     ########################################################################
     
-    figs_destination = 'figs/filtered_figs/normal/' + filename.split('_m')[0]
+    figs_destination = 'figs/filtered_figs/' + file_dest + filename.split('_m')[0]
 
     # Saving the kalman filtered predictions
     Winds              = Xs[9:12]                             # Predicted alpha from KF
@@ -233,17 +234,32 @@ for filename in files:
         print(f"\n***************************************\nSaving figures to location: {figs_destination}\n***************************************\n")
         plt.savefig(f'{figs_destination}_vtas_alpha_beta.pdf')
 
-    # plt.show()
+    # # plt.show()
     x      = dt*np.arange(0, num_samples, 1)
 
+    # plotting navigation velocities
     ys     = {r'raw u': [Z[3], 0.3],
             r'raw v': [Z[4], 0.3],
             r'raw w': [Z[5], 0.3],
             r'kf u':  [Zs[3], 1.0],
             r'kf v':  [Zs[4], 1.0],
             r'kf w':  [Zs[5], 1.0],}
-    make_plots(x, [ys], f'{figs_destination} raw and kalman-filtered navigation velocities', r'Time $[s]$', [r'Nav velocities $[m/s]$'], save=printfigs, colors=colors)
+    ys2    = {r'$\sigma^2(u)$': [kalman_filter.PP_k1_k1[3], 1.0],
+              r'$\sigma^2(v)$': [kalman_filter.PP_k1_k1[4], 1.0],
+                r'$\sigma^2(w)$': [kalman_filter.PP_k1_k1[5], 1.0]}
+    make_plots(x, [ys, ys2], f'{figs_destination} raw and kalman filtered navigation velocities', r'Time $[s]$', [r'Nav velocities $[m/s]$', r'$v^2 [m^2/s^2]$'], save=printfigs, colors=colors, log=1)
 
+    # plotting zoomed in navigation velocities
+    ys1    = {f'raw u': [Z[3], 0.3],
+              f'kf u':  [Zs[3], 1.0]}
+    ys2    = {f'raw v': [Z[4], 0.3],
+                f'kf v':  [Zs[4], 1.0]}
+    ys3    = {f'raw w': [Z[5], 0.3],
+                f'kf w':  [Zs[5], 1.0]}
+    make_plots(x, [ys1, ys2, ys3], f'{figs_destination} raw and kalman filtered navigation velocities zoomed', r'Time $[s]$', [r'U $[m/s]$', r'$V [m/s]$', r'W $[m/s]$'], save=printfigs, colors=colors)
+
+
+    # plotting positions
     ys = {r'raw x': [Z[0], 0.3],
         r'raw y': [Z[1], 0.3],
         r'raw z': [Z[2], 0.3],
@@ -253,8 +269,19 @@ for filename in files:
     ys2 = {r'$\sigma^2(x)$': [kalman_filter.PP_k1_k1[0], 1.0],
         r'$\sigma^2(y)$': [kalman_filter.PP_k1_k1[1], 1.0],
         r'$\sigma^2(z)$': [kalman_filter.PP_k1_k1[2], 1.0]}
-    make_plots(x, [ys, ys2], f'{figs_destination} raw and kalman-filtered positions', r'Time $[s]$', [r'$x [m]$', r'$x^2 [m^2]$'], colors=colors, save=printfigs, log=1)
+    make_plots(x, [ys, ys2], f'{figs_destination} raw and kalman filtered positions', r'Time $[s]$', [r'$x [m]$', r'$x^2 [m^2]$'], colors=colors, save=printfigs, log=1)
 
+    # plotting zoomed in positions
+    ys1     = {r'raw x': [Z[0], 0.3],
+               r'kf x':  [Xs[0], 1.0]}
+    ys2     = {r'raw y': [Z[1], 0.3],
+                r'kf y':  [Xs[1], 1.0]}
+    ys3     = {r'raw z': [Z[2], 0.3],
+                r'kf z':  [Xs[2], 1.0]}
+    make_plots(x, [ys1, ys2, ys3], f'{figs_destination} raw and kalman filtered navigation positions zoomed', r'Time $[s]$', [r'x position $[m]$', r'y position $[m]$', r'z position $[m]$'], save=printfigs, colors=colors)
+
+
+    # plotting body velocities
     ys     = {r'kf body u':  [Xs[3], 1.0],
             r'kf body v':  [Xs[4], 1.0],
             r'kf body w':  [Xs[5], 1.0],}
@@ -263,6 +290,7 @@ for filename in files:
         r'$\sigma^2(w)$': [kalman_filter.PP_k1_k1[5], 1.0]}
     make_plots(x, [ys, ys2], f'{figs_destination} estimated body velocities', r'Time $[s]$', [r'$u [m/s]$', r'$u^2 [m^2/s^2]$'], colors=colors, save=printfigs, log=1)
 
+    # plotting nav angles
     ys      = {r'raw $\phi$':   [Z[6], 0.3],
             r'raw $\theta$': [Z[7], 0.3],
             r'raw $\psi$':   [Z[8], 0.3], 
@@ -272,8 +300,18 @@ for filename in files:
     ys2     = {r'$\sigma^2(\phi) $': [kalman_filter.PP_k1_k1[6], 1.0],
             r'$\sigma^2(\theta2)$': [kalman_filter.PP_k1_k1[7], 1.0],
             r'$\sigma^2(\psi) $': [kalman_filter.PP_k1_k1[8], 1.0]}
-    make_plots(x, [ys, ys2], f'{figs_destination} raw and kalman-filtered angles', r'Time $[s]$', [r'$\phi [rad]$', r'$\phi^2 [rad^2]$'], colors=colors, save=printfigs, log=1)
+    make_plots(x, [ys, ys2], f'{figs_destination} raw and kalman filtered angles', r'Time $[s]$', [r'$\phi [rad]$', r'$\phi^2 [rad^2]$'], colors=colors, save=printfigs, log=1)
 
+    # plotting zoomed in nav angles 
+    ys1 = {r'raw $\phi$':   [Z[6], 0.3],
+            r'kf $\phi$':    [Xs[6], 1.0]}
+    ys2 = {r'raw $\theta$': [Z[7], 0.3],
+            r'kf $\theta$':  [Xs[7], 1.0]}
+    ys3 = {r'raw $\psi$':   [Z[8], 0.3],
+            r'kf $\psi$':    [Xs[8], 1.0]}
+    make_plots(x, [ys1, ys2, ys3], f'{figs_destination} raw and kalman filtered angles zoomed', r'Time $[s]$', [r'$\phi [rad]$', r'$\theta [rad]$', r'$\psi [rad]$'], colors=colors, save=printfigs)
+
+    # plotting winds
     ys1 = {r'$W_x$': [Winds[0], 1.0],
         r'$W_y$': [Winds[1], 1.0],
         r'$W_z$': [Winds[2], 1.0]}
@@ -282,6 +320,7 @@ for filename in files:
         r'$\sigma^2(W_z)$': [Winds_covariances[2], 1.0]}
     make_plots(x, [ys1, ys2], f'{figs_destination} Wind over time', r'Time $[s]$', [r'Wind $[m/s]$', r'Variance $[m^2/s^2]$'], save=printfigs, log=1)
 
+    # plotting accelerometer biases
     ys1 = {r'$\lambda_{x_r}$': [new_lambdas[0], 1.0],
             r'$\lambda_{y_r}$': [new_lambdas[1], 1.0],
             r'$\lambda_{z_r}$': [new_lambdas[2], 1.0]}
@@ -290,6 +329,7 @@ for filename in files:
             r'$\sigma^2(\lambda_{z_r})$': [lambda_covariances[2], 1.0]}
     make_plots(x, [ys1, ys2], f'{figs_destination} acceleration biases variance over time', r'Time $[s]$', [r'Acceleration Bias $[m/s^2]$', r'$Variance [m^2/s^4]$'], save=printfigs, log=1)
 
+    # plotting rate gyro biases
     ys1 = {r'$\lambda_{p_r}$': [new_lambdas[3], 1.0],
             r'$\lambda_{q_r}$': [new_lambdas[4], 1.0],
             r'$\lambda_{r_r}$': [new_lambdas[5], 1.0]}
@@ -298,28 +338,37 @@ for filename in files:
             r'$\sigma^2(\lambda_{r_r})$': [lambda_covariances[5], 1.0]}
     make_plots(x, [ys1, ys2], f'{figs_destination} attitude rate bias variances over time', r'Time $[s]$', [r'Attitude Rate Bias $[rad/s]$', r'$Variance [rad^2/s^2]$'], save=printfigs, log=1)
 
-    ys = {r'$A_x$': [U[0, :], 0.7],
-            r'$A_y$': [U[1, :], 0.7],
-            r'$A_z$': [U[2, :], 0.7]}
-    make_plots(x, [ys], f'{figs_destination} IMU accelerations', r'Time $[s]$', [r'Accelerations $[m/s^2]$'], save=printfigs)
+    # ys = {r'$A_x$': [U[0, :], 0.7],
+    #         r'$A_y$': [U[1, :], 0.7],
+    #         r'$A_z$': [U[2, :], 0.7]}
+    # make_plots(x, [ys], f'{figs_destination} IMU accelerations', r'Time $[s]$', [r'Accelerations $[m/s^2]$'], save=printfigs)
 
-    ys = {r'$A_p$': [U[3, :], 0.7],
-            r'$A_q$': [U[4, :], 0.7],  
-            r'$A_r$': [U[5, :], 0.7]}  
-    make_plots(x, [ys], f'{figs_destination} IMU attitude rates', r'Time $[s]$', [r'Attitude rates $[rad/s]$'], save=printfigs)
+    # ys = {r'$A_p$': [U[3, :], 0.7],
+    #         r'$A_q$': [U[4, :], 0.7],  
+    #         r'$A_r$': [U[5, :], 0.7]}  
+    # make_plots(x, [ys], f'{figs_destination} IMU attitude rates', r'Time $[s]$', [r'Attitude rates $[rad/s]$'], save=printfigs)
 
+    # plotting iterations taken by iekf
     ys = {'Iterations taken by IEKF': [kalman_filter.itr_counts, 1.0]}
     make_plots(x, [ys], f'{figs_destination} Iterations taken by IEKF', r'Time $[s]$', [r'Iterations'], save=printfigs)
 
-    ys = {'innovation': [kalman_filter.innovations[0], 1.0]}
-    make_plots(x, [ys], f'{figs_destination} innovation', r'Time $[s]$', [r'Total Innovation'], save=printfigs, log=0)
+    # quick plot of autocorrelation of innovation
+    innovation = kalman_filter.innovations[0]
+    ys = {'innovation': [innovation, 1.0]}
+    make_plots(x, [ys], f'{figs_destination} innovation', r'Time $[s]$', [r'Innovation'], save=printfigs)
+
+    innov_ac = np.correlate(innovation, innovation, mode='full')
+
+    ys = {'innovation autocorrelation': [innov_ac, 1.0]}
+    make_plots(np.arange(innov_ac.size), [ys], f'{figs_destination} innovation autocorrelation', r'Shift time $[s]$', [r'Innovation Autocorrelation'], save=printfigs)
+
 
     if show_plot:
         plt.show()
     
     plt.close('all')
 
-all_results_file.close()
+# all_results_file.close()
 time2 = time.time()
 print(f"\nTotal time taken: {round(time2-time1,6)} s")
 print("\n\n\n***************************************\nAll filtering finished\n***************************************\n\n\n")

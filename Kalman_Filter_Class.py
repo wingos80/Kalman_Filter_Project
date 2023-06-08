@@ -168,11 +168,11 @@ class IEKF:
 
         # Calc Jacobians, Phi(k+1, k), and Gamma(k+1, k)
         Fx_jacobian  = self.Fx(0, self.x_k1_k, U_k)
-        Fu_jacobian  = self.Fu(0, self.x_k1_k, U_k)
+        Fw_jacobian  = G
 
         # discretizing the state transition and input matrices according to how C.C. de Visser does it in his PhD thesis
         Phi = c2d(Fx_jacobian, self.dt)
-        Gamma = c2d(Fx_jacobian, self.dt, n_plus=1)@Fu_jacobian
+        Gamma = c2d(Fx_jacobian, self.dt, n_plus=1)@Fw_jacobian
 
         # ss_G        = control.matlab.ss(Fx_jacobian, G, np.zeros((self.nm, self.n)), np.zeros((self.nm, G.shape[1])))  # state space model with A and G matrices, to identify phi and gamma matrices
         # Phi         = control.matlab.c2d(ss_G, self.dt).A
@@ -229,7 +229,7 @@ class IEKF:
                 print('\n\n\n\n**********************WARNING**********************\n\n')
                 print(f'The current states are not observable; rank of Observability Matrix is {rankHF}, should be {self.n}\n')
 
-        residual = Z_k.reshape(self.nm,1) - self.h(0, eta1, U_k)
+        residual = Z_k.reshape(-1,1) - self.h(0, eta1, U_k)
 
         # Calculate the Kalman Gain
         res_covariance = H_j@self.P_k1_k@H_j.T + self.R
@@ -244,7 +244,6 @@ class IEKF:
         self.Kalman_Gain = Kalman_Gain
         self.eta2 = eta2
         self.residual = residual
-        self.z_k1_k = self.h(0, eta1, U_k) 
 
 
     def update(self, U_k, k):
@@ -261,6 +260,7 @@ class IEKF:
         # Updating the state estimate
         self.x_k1_k1 = self.eta2
         self.x_k1_k1_dot = self.f(0, self.x_k1_k1, U_k) # for validation, im 
+        self.z_k1_k1 = self.h(0, self.eta2, U_k) 
         
         # Making some local variables for readability
         K   = self.Kalman_Gain
@@ -271,16 +271,16 @@ class IEKF:
         self.P_k1_k1          = (self.eye_n - K@H_j)@self.P_k1_k@(self.eye_n - K@H_j).transpose() + K@self.R@K.transpose()    
         self.std_x_cor   = np.sqrt(self.P_k1_k1.diagonal())        # standard deviation of state estimation error (for validation)
 
-        # calculate the kalman filter 'innovation', difference in measured and predicted observation
+        # # calculate the kalman filter 'innovation', difference in measured and predicted observation
         innovation = np.linalg.norm(self.residual)
 
         # Store results, need to flatten the arrays to store in a matrix
-        self.ZZ_pred[:,k]    = self.z_k1_k.flatten()              # predicted observation
+        self.ZZ_pred[:,k]    = self.z_k1_k1.flatten()              # predicted observation
         self.XX_k1_k1[:,k]   = self.x_k1_k1.flatten()             # estimated state
         self.PP_k1_k1[:,k]   = self.P_k1_k1.diagonal().flatten()  # estimated state covariance (for validation)
         self.STD_x_cor[:,k]  = self.std_x_cor.flatten()           # standard deviation of state estimation error (for validation)
         self.STD_z[:,k]      = self.std_z.flatten()               # standard deviation of observation error (for validation)
-        self.innovations[:,k] = innovation               # kalman filter 'innovation'
+        self.innovations[:,k] = innovation                        # kalman filter 'innovation'
 
         # Update to next time step
         self.t_k         = self.t_k1 

@@ -216,7 +216,7 @@ class Individual:
 
 class ES:
     def __init__(self, fitness_function=lambda x: 0, num_dimensions=3, 
-                 num_generations=200, num_individuals=100, 
+                 num_generations=200, num_individuals=150, 
                  num_offspring_per_individual=6, verbose=False):
         self.fitness_function = fitness_function
         self.num_dimensions = num_dimensions
@@ -263,7 +263,7 @@ class ES:
                     parent_genotype = parent.genotype
                     parent_strategy_parameter = parent.strategy_parameters[0]
                     new_genotype = np.array([parent_genotype[i]+np.random.normal(0,parent_strategy_parameter) for i in range(self.num_dimensions)])
-                    new_strategy_parameters = np.array([max(parent_strategy_parameter*np.exp(np.random.normal(0,1/self.num_dimensions)),10**(-4))])
+                    new_strategy_parameters = np.array([max(parent_strategy_parameter*np.exp(np.random.normal(0,1/self.num_dimensions)),10**(-5))])
                     offsprings.append(Individual(new_genotype, new_strategy_parameters))
             population += offsprings
             # population = sorted(population, key=lambda individual: self.fitness_function(individual.genotype))[:self.num_individuals]
@@ -271,7 +271,7 @@ class ES:
             selection = []
             selection_pool = population.copy()  
             pool_fitness = np.array([self.fitness_function(individual.genotype) for individual in population])
-            tournament_size = 10
+            tournament_size = int(len(selection_pool)/10)
             for _ in range(self.num_individuals):
                 # print(f'shape of selection pool and fitness: {selection_pool.shape}, {pool_fitness.shape}')
                 match = np.random.choice(np.arange(0,int(len(selection_pool))), tournament_size, replace=False)
@@ -296,7 +296,7 @@ class ES:
                 break
             if self.verbose:
                 plt.figure(1)
-                y = itr_best.genotype[0] + itr_best.genotype[1]*x + itr_best.genotype[2]*x**2 + itr_best.genotype[3]*x**3 + itr_best.genotype[4]*x**4
+                y = itr_best.genotype[0] + itr_best.genotype[1]*x + itr_best.genotype[2]*x**2 + itr_best.genotype[3]*x**3
                 plt.plot(x,y)
                 plt.ylim(-2.5,6)
                 plt.grid()

@@ -10,6 +10,9 @@ import matplotlib.pyplot as plt
 from Optimize import *
 from scipy.optimize import minimize
 
+# g = 9.78335                # gravitational acceleration [m/s^2]
+g = 9.80665                # gravitational acceleration [m/s^2]
+
 
 def rk4(fn, xin, uin, t):
     """
@@ -57,7 +60,7 @@ def rk4(fn, xin, uin, t):
     return t, xout
 
 
-def kf_finite_difference(dx, Ys, step_size=10, central_difference=False):
+def kf_finite_difference(dx, Ys, step_size=15, central_difference=False):
     """
     Function that numerically differentiates the given Ys array along axis=1,
     using a finite difference method. The step size of the differentiator can
@@ -72,13 +75,23 @@ def kf_finite_difference(dx, Ys, step_size=10, central_difference=False):
         step size of the finite differentiator, bigger step means less noisey derivative 
     Returns
     -------
-    first_derivative : numpy.ndarray
+    f_x : numpy.ndarray
         first derivative of the input array
-    second_derivative : numpy.ndarray
+    f_xx : numpy.ndarray
         second derivative of the input array
     """
+    temp = Ys.shape
+    assert len(temp) <= 2, "Ys array must be 1D or 2D"
+    assert step_size > 0, "step_size must be greater than 0"
+    assert step_size < temp[-1], "step_size must be smaller than the length of the array"
+
+    one_dim = False
+    if len(temp) == 1:
+        Ys = Ys.reshape(1, temp[0])
+        one_dim = True
+    
     # Initialize arrays to store derivatives
-    first_derivative, second_derivative = np.zeros_like(Ys), np.zeros_like(Ys)
+    f_x, f_xx = np.zeros_like(Ys), np.zeros_like(Ys)
     
     if central_difference:
         # First derivative
@@ -88,31 +101,34 @@ def kf_finite_difference(dx, Ys, step_size=10, central_difference=False):
 
         # Interpolate the first derivative array to the original Ys array size
         for i, val in enumerate(Ys):
-            first_derivative[i,:] = np.interp(temp2, temp2[::step_size], temp[i,:])
+            f_x[i,:] = np.interp(temp2, temp2[::step_size], temp[i,:])
 
-        # # Second derivative
-        temp = (np.diff(first_derivative[:,:-step_size:step_size], n=1) + np.diff(first_derivative[:,step_size::step_size], n=1))/(2*step_size*dx) # array containing the second derivatives
+        # Second derivative
+        temp = (np.diff(f_x[:,:-step_size:step_size], n=1) + np.diff(f_x[:,step_size::step_size], n=1))/(2*step_size*dx) # array containing the second derivatives
         temp[:,0] = temp[:,1]
         temp[:,-1] = temp[:,-2]
         temp = np.append(temp[:,0].reshape(Ys.shape[0],1), np.append(temp, temp[:,-1].reshape(Ys.shape[0],1), axis=1), axis=1)           # append the last column of the array to the end
 
         # Interpolate the first derivative array to the original Ys array size
         for i, val in enumerate(Ys):
-            second_derivative[i,:] = np.interp(temp2, temp2[::step_size], temp[i,:])
+            f_xx[i,:] = np.interp(temp2, temp2[::step_size], temp[i,:])
     else:
         # First derivative
         Ys_shifted = np.roll(Ys, step_size, axis=1)
+        f_x = (Ys - Ys_shifted)/(step_size*dx)
         for i in range(step_size):
-            Ys_shifted[:, i] = Ys_shifted[:, step_size]        # zero order hold
-        first_derivative = (Ys - Ys_shifted)/(step_size*dx)
+            f_x[:, i] = f_x[:, step_size]        # zero order hold for the first couple of columns
 
         # Second derivative
-        Ys_shifted = np.roll(first_derivative, step_size, axis=1)
-        for i in range(step_size):
-            Ys_shifted[:, i] = Ys_shifted[:, step_size]        # zero order hold
-        second_derivative = (first_derivative - Ys_shifted)/(step_size*dx)
+        Ys_shifted = np.roll(f_x, step_size, axis=1)
+        f_xx = (f_x - Ys_shifted)/(step_size*dx)
+        for i in range(2*step_size):
+            f_xx[:, i] = f_xx[:, 2*step_size]        # zero order hold for the first couple of columns
 
-    return first_derivative, second_derivative
+    if one_dim:
+        return f_x.flatten(), f_xx.flatten()
+    else:
+        return f_x, f_xx
 
 
 def kf_calc_Fc(m, rho, S, Vs, accs):
@@ -198,7 +214,6 @@ def kf_calc_f(t, X, U):
     
     n       = X.size
     Xdot    = np.zeros([n,1])
-    g = 9.80665                # gravitational acceleration [m/s^2]
 
     # saving the individual state and input names to make the code more readable
     x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
@@ -251,7 +266,6 @@ def kf_calc_Fx(t, X, U):
     """
     n = X.size
     DFx = np.zeros([n, n])
-    g = 9.80665                # gravitational acceleration [m/s^2]
     
     # saving the individual state and input names to make the code more readable
     x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
@@ -356,7 +370,6 @@ def kf_calc_Fu(t, X, U):
     n = X.size
     nu = U.size
     DFu = np.zeros([n, nu])
-    g = 9.80665                # gravitational acceleration [m/s^2]
     
     # saving the individual state and input names to make the code more readable
     u, v, w, phi, theta = X[3], X[4], X[5], X[6], X[7]
@@ -420,7 +433,6 @@ def kf_calc_h(t, X, U):
     """
     n = X.size
     Zpred = np.zeros((12,1))
-    g = 9.80665                # gravitational acceleration [m/s^2]
 
     # saving the individual state and input names to make the code more readable
     x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
@@ -474,7 +486,6 @@ def kf_calc_Hx(t, X, U):
     """
     n = X.size
     DHx = np.zeros([12, n])
-    g = 9.80665                # gravitational acceleration [m/s^2]
     
     # saving the individual state and input names to make the code more readable
     x, y, z, u, v, w, phi, theta, psi, Wx, Wy, Wz = X[0], X[1], X[2], X[3], X[4], X[5], X[6], X[7], X[8], X[9], X[10], X[11]
@@ -621,7 +632,7 @@ class model:
         self.ensemble_cov = np.zeros((N, N))
         if solver=="ES":
             if self.verbose: print(f'\n    Running Evolutionary Strategies to optimize the Maximum Likelihood...')
-            test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_generations=200, num_offspring_per_individual=6, verbose=False)
+            test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_generations=100, num_offspring_per_individual=8, verbose=False)
             self.MLE_params = test.run().reshape(self.n_params,1)
             self.MLE_best   = test.group_best_fit
             if self.verbose: print(f'    Finished Evolutionary Strategies Maximum Likelihood \n')
@@ -708,22 +719,25 @@ class model:
         A = self.regression_matrix
         y = self.measurements
         p = A@MLE_params
-        N = y.size
+        # N = y.size
+
         epsilon = y-p
-        self.ensemble_cov += epsilon@epsilon.T
-        self.trigger           +=1
-        if self.trigger < 2*self.n_params:
-            ensemble_cov = np.eye(N)
-        else:
-            ensemble_cov = self.ensemble_cov/self.trigger
+        # self.ensemble_cov += epsilon@epsilon.T
+        # self.trigger      +=1
+        # if self.trigger < 2*self.n_params:
+        #     ensemble_cov = np.eye(N)
+        # else:
+        #     ensemble_cov = self.ensemble_cov
+        # ensemble_cov = np.eye(N)
             
         # cov = np.eye(N) - self.H
-        likelihood = -epsilon.T@ensemble_cov@epsilon
+        # likelihood = epsilon.T@np.linalg.inv(ensemble_cov)@epsilon
 
         # likelihood = 0.5/ensemble_cov*epsilon.T@epsilon + N/2*np.log(ensemble_cov) + 0.5*np.log(2*np.pi)
         # likelihood = np.prod(epsilon**2)
-        # likelihood = np.sqrt(epsilon.T@epsilon)   
+        # likelihood = np.sqrt(epsilon.T@epsilon)
         # likelihood = np.sqrt(np.sum(epsilon**2))
+        likelihood = epsilon.T@epsilon
         return likelihood
 
 
