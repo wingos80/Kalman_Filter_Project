@@ -115,15 +115,17 @@ def kf_finite_difference(dx, Ys, step_size=15, central_difference=False):
     else:
         # First derivative
         Ys_shifted = np.roll(Ys, step_size, axis=1)
+        Ys_shifted[:,:step_size] = Ys_shifted[:,step_size].reshape(Ys.shape[0],1)        # zero order hold for the first couple of columns 
         f_x = (Ys - Ys_shifted)/(step_size*dx)
-        for i in range(step_size):
-            f_x[:, i] = f_x[:, step_size]        # zero order hold for the first couple of columns
+        # for i in range(step_size):
+        #     f_x[:, i] = f_x[:, step_size]        # zero order hold for the first couple of columns
 
         # Second derivative
         Ys_shifted = np.roll(f_x, step_size, axis=1)
+        Ys_shifted[:,:step_size] = Ys_shifted[:,step_size].reshape(Ys.shape[0],1)        # zero order hold for the first couple of columns 
         f_xx = (f_x - Ys_shifted)/(step_size*dx)
-        for i in range(2*step_size):
-            f_xx[:, i] = f_xx[:, 2*step_size]        # zero order hold for the first couple of columns
+        # for i in range(2*step_size):
+        #     f_xx[:, i] = f_xx[:, 2*step_size]        # zero order hold for the first couple of columns
 
     if one_dim:
         return f_x.flatten(), f_xx.flatten()
