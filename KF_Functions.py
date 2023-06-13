@@ -614,7 +614,7 @@ class model:
         self.OLS_cov = np.linalg.inv(A.T@A)
         self.OLS_params = self.OLS_cov@A.T@self.measurements
 
-        self.OLS_y    = (A@self.OLS_params)
+        self.OLS_y    = (A@self.OLS_params).flatten()
         self.OLS_RMSE = self.calc_RMSE(self.OLS_y, self.measurements)  # calculating the RMSE of the OLS estimate
         self.OLS_R2   = self.calc_R2(self.OLS_y, self.measurements)      # calculating the R2 of the OLS estimate
         if self.verbose: print(f'Finished OLS\n')
@@ -634,7 +634,7 @@ class model:
         self.ensemble_cov = np.zeros((N, N))
         if solver=="ES":
             if self.verbose: print(f'\n    Running Evolutionary Strategies to optimize the Maximum Likelihood...')
-            test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_generations=100, num_offspring_per_individual=8, verbose=False)
+            test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_individuals=50, num_generations=100, num_offspring_per_individual=4, verbose=False)
             self.MLE_params = test.run().reshape(self.n_params,1)
             self.MLE_best   = test.group_best_fit
             if self.verbose: print(f'    Finished Evolutionary Strategies Maximum Likelihood \n')
@@ -657,7 +657,7 @@ class model:
         else:
             raise ValueError(f"\n    Solver {solver} not recognized. Please choose either 'ES' or 'scipy'\n")
         
-        self.MLE_y      = A@self.MLE_params   
+        self.MLE_y      = (A@self.MLE_params).flatten()
         self.MLE_RMSE   = self.calc_RMSE(self.MLE_y, self.measurements)    # calculating the RMSE of the MLE estimate
         self.MLE_R2     = self.calc_R2(self.MLE_y, self.measurements)      # calculating the R2 of the MLE estimate
         if self.verbose: print(f'Finished MLE\n')
@@ -677,8 +677,8 @@ class model:
         self.RLS_all_params = np.zeros((self.n_params,N))   # initializing the RLS parameters for all measurements
 
         for i in range(N):
-            smol_a          = A[[i],:]                      
-            smol_y          = y[[i],:]
+            smol_a          = A[[i],:].copy()                      
+            smol_y          = y[[i],:].copy()
             RLS_gain        = P@smol_a.T@np.linalg.inv(smol_a@P@smol_a.T+1)
             RLS_params = RLS_params + RLS_gain@(smol_y - smol_a@RLS_params)
             P               = (np.eye(self.n_params) - RLS_gain@smol_a)@P
@@ -695,8 +695,9 @@ class model:
                 plt.ylim(-150,150)
                 plt.pause(0.05)
                 plt.clf()
-
-        self.RLS_y      = A@RLS_params
+        
+        # calculating the final RLS parameters and model outputs
+        self.RLS_y      = (A@RLS_params).flatten()
         self.RLS_cov    = P
         self.RLS_params = RLS_params
         self.RLS_RMSE   = self.calc_RMSE(self.RLS_y, self.measurements)    # calculating the RMSE of the RLS estimate
@@ -706,7 +707,7 @@ class model:
 
     def log_likelihood(self, MLE_params):
         """
-        Calculates an augmented log likelihood of the model given the measurements and the model parameters
+        Calculates a log likelihood of the model given the measurements and the model parameters
         """
         # covaraince is NxN, with N = number of measurements.
         # function to maximize:
@@ -717,23 +718,23 @@ class model:
         # two possible errors:
         # 1. the log likelihood should be max(-np.log(2*np.pi)**(N/2)*np.linalg.det(cov)**0.5 - 0.5(y-p)@np.linal.inv(cov)@(y-p))
         # 2. the cov matrix should be MxM, M being number of params
+        
         MLE_params = MLE_params.reshape(self.n_params,1)    # making the params into a column vector so that it can be used in matrix calculations
         A = self.regression_matrix
         y = self.measurements
         p = A@MLE_params
-        # N = y.size
+        N = y.size
 
         epsilon = y-p
         # self.ensemble_cov += epsilon@epsilon.T
-        # self.trigger      +=1
-        # if self.trigger < 2*self.n_params:
+        # cov_rank = np.linalg.matrix_rank(self.ensemble_cov)
+        # if cov_rank < N:
         #     ensemble_cov = np.eye(N)
         # else:
         #     ensemble_cov = self.ensemble_cov
-        # ensemble_cov = np.eye(N)
             
-        # cov = np.eye(N) - self.H
-        # likelihood = epsilon.T@np.linalg.inv(ensemble_cov)@epsilon
+        # # cov = np.eye(N) - self.H
+        # likelihood = np.log(np.linalg.det(ensemble_cov)) + epsilon.T@np.linalg.inv(ensemble_cov)@epsilon
 
         # likelihood = 0.5/ensemble_cov*epsilon.T@epsilon + N/2*np.log(ensemble_cov) + 0.5*np.log(2*np.pi)
         # likelihood = np.prod(epsilon**2)

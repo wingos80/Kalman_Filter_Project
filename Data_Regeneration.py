@@ -70,6 +70,7 @@ for filename in files:
     v_n        = train_data[26]    # velocities are in the local earth frame (north, East, Down frame!!)
     w_n        = train_data[27]    # velocities are in the local earth frame (north, East, Down frame!!)
     
+
     ########################################################################
     ## Setting the parameters for generating the "real" data
     ########################################################################

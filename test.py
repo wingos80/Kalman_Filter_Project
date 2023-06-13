@@ -9,7 +9,7 @@ from Plotter import *
 
 
 x = np.arange(-2,7,0.1)
-y = -1 -x + 5*x**2 - x**3
+y = -1 -x + 5*x**2 - x**3 + 0.25*x**4 + np.random.normal(0,0.1,len(x))
 # y = 1 + 2*x - 0.3*x**2 -x**3 + 0.25*x**4
 n = 1
 OLS_RMSE = 0
@@ -20,9 +20,9 @@ MLE_SCI = 0
 
 plt.figure()
 for i in range(n):
-    y_noise = y+np.random.normal(0,1,y.size)
+    y_noise = y+np.random.rand(y.size)
 
-    f_model = model(np.array([np.ones_like(x), x, x**2, x**3]).T,verbose=True)
+    f_model = model(np.array([np.ones_like(x), x, x**2, x**3, x**4]).T,verbose=False)
     f_model.measurements = y_noise.reshape(y_noise.size,1)
     f_model.OLS_estimate()
     # f_model.MLE_estimate(solver="scipy")
@@ -30,14 +30,12 @@ for i in range(n):
     # plt.plot(x,f_model.MLE_y, label='MLE estimate scipy')
     # MLE_SCI += np.sqrt(np.sum((f_model.MLE_y.flatten()-y)**2))
 
-    f_model.MLE_estimate(solver="ES")
+    f_model.MLE_estimate(solver="scipy")
     print(f'ES mle params: {f_model.MLE_params}')
-    plt.plot(x,f_model.MLE_y, label='MLE estimate ES')
+    # plt.plot(x,f_model.MLE_y, label='MLE estimate ES')
     MLE_ES += np.sqrt(np.sum((f_model.MLE_y.flatten()-y)**2))
 
-    # f_model.RLS_estimate()
-
-
+    f_model.RLS_estimate()
 
     # OLS_RMSE += np.sqrt(np.sum((f_model.OLS_y.flatten()-y)**2))
     # MLE_RMSE += np.sqrt(np.sum((f_model.MLE_y.flatten()-y)**2))
@@ -61,8 +59,8 @@ print(f_model)
 
 # plt.plot(x,y, label='original function',alpha=0.4)
 plt.plot(x,f_model.OLS_y, label='OLS estimate', alpha=0.7)
-plt.plot(x,f_model.MLE_y, label='MLE estimate', alpha=0.7)
-# plt.plot(x,f_model.RLS_y, label='RLS estimate')
+# plt.plot(x,f_model.MLE_y, label='MLE estimate', alpha=0.7)
+plt.plot(x,f_model.RLS_y, label='RLS estimate')
 # plt.scatter(x,y,s=1.5,label='data points',marker='o')
 plt.scatter(x,y_noise, label='noisey function',alpha=0.4)
 # plt.ylim(-2.5,6)

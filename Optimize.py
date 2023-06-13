@@ -235,7 +235,7 @@ class ES:
         else:
             self.terminate_confidence = 0
 
-        if self.terminate_confidence > 40:
+        if self.terminate_confidence > 30:
             return True
         else:
             return False
@@ -294,15 +294,15 @@ class ES:
 
             if self.terminate():
                 break
-            if self.verbose:
-                plt.figure(1)
-                y = itr_best.genotype[0] + itr_best.genotype[1]*x + itr_best.genotype[2]*x**2 + itr_best.genotype[3]*x**3
-                plt.plot(x,y)
-                plt.ylim(-2.5,6)
-                plt.grid()
-                plt.pause(0.2)
-                plt.clf()
-                print(f"[gen {generation:3}] Best fitness: {self.fitness_function(best.genotype)}")
+            # if self.verbose:
+            #     plt.figure(1)
+            #     y = itr_best.genotype[0] + itr_best.genotype[1]*x + itr_best.genotype[2]*x**2 + itr_best.genotype[3]*x**3
+            #     plt.plot(x,y)
+            #     plt.ylim(-2.5,6)
+            #     plt.grid()
+            #     plt.pause(0.2)
+            #     plt.clf()
+            #     print(f"[gen {generation:3}] Best fitness: {self.fitness_function(best.genotype)}")
             # if generation%10==0:
             #     print(f'{round(toc-tic,6)} s tour size{tournament_size}\nself.itr_best_fit: {self.itr_best_fit}\nself.group_best_fit: {self.group_best_fit}\n\n')
 

@@ -21,21 +21,22 @@ sns.set(style = "darkgrid")                  # Set seaborn style
 ########################################################################
 ## Start writing measurements to csv files
 ########################################################################
-save      = False             # enable saving data
+save      = True             # enable saving data
 show_plot = True              # enable plotting
-printfigs = False             # enable saving figures
-file_dest = 'noise/'
+printfigs = True             # enable saving figures
+file_dest = 'normal2/'
 
 # all_results_file = open("data/all_results.csv", "w")
 # all_results_file.write(f"x_kf, y_kf, z_kf, u_kf, v_kf, w_kf, phi_kf, theta_kf, psi_kf, Wx_kf, Wy_kf, Wz_kf, Lx_kf, Ly_kf, Lz_kf, Lp_kf, Lq_kf, Lr_kf, da, de, dr, Tc1, Tc2, V, alpha, beta\n")
 
 # Change the current working directory to the data folder and process all original csv files
-os.chdir("data/regenerated/" + file_dest)
+os.chdir("data/regenerated/noise/")
 files = os.listdir(os.getcwd())
 os.chdir("../../..")
 
 time1 = time.time()
-files = ['de3211_1_measurements.csv']
+# files = ['de3211_1_measurements.csv']
+files = ['da3211_2_measurements.csv']
 for filename in files:
     print(f"\n\nFiltering data for {filename}...\n\n")
     ########################################################################
@@ -43,7 +44,7 @@ for filename in files:
     ########################################################################
 
     # filename = 'data/de3211_1_measurements.csv'
-    train_data = genfromtxt('data/regenerated/' + file_dest + filename, delimiter=',').T
+    train_data = genfromtxt('data/regenerated/noise/' + filename, delimiter=',').T
     train_data = train_data[:, 1:]
 
     xyz        = train_data[0:3]                   # First 3 columns are the simulated xyz's 
@@ -83,7 +84,7 @@ for filename in files:
     B           = np.zeros([18,6])                                                                            # input matrix
 
     # Initial state standard deviation estimates
-    P_stds  = [0.1, 0.1, 0.1, 0.5, 0.5, 0.5, 0.01, 0.01, 0.01, 2, 8, 1, 0.002, 0.002, 0.002, 0.0003*np.pi/180, 0.0003*np.pi/180, 0.0003*np.pi/180]
+    P_stds  = [0.1, 0.1, 0.1, 0.5, 0.5, 0.5, 0.01, 0.01, 0.01, 5, 5, 5, 0.02, 0.02, 0.02, 0.003*np.pi/180, 0.003*np.pi/180, 0.003*np.pi/180]
     
     
     # System noises, all noise are white (unbiased and uncorrelated in time)
@@ -144,10 +145,6 @@ for filename in files:
         bing = time.time()
         
         # Picking out the k-th entry in the input and measurement vectors
-        # if k == num_samples-1:
-        #     U_k = U[:,k]
-        # else:
-        #     U_k = (U[:,k] + U[:,k+1])/2
         U_k = U[:,k]
         Z_k = Z[:,k]
 
@@ -360,7 +357,8 @@ for filename in files:
     innov_ac = np.correlate(innovation, innovation, mode='full')
 
     ys = {'innovation autocorrelation': [innov_ac, 1.0]}
-    make_plots(np.arange(innov_ac.size), [ys], f'{figs_destination} innovation autocorrelation', r'Shift time $[s]$', [r'Innovation Autocorrelation'], save=printfigs)
+    x2 = np.hstack((-np.flip(x), x))
+    make_plots(x2, [ys], f'{figs_destination} innovation autocorrelation', r'Shift time $[s]$', [r'Innovation Autocorrelation'], save=printfigs)
 
 
     if show_plot:
