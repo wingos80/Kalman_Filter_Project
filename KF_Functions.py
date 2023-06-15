@@ -600,6 +600,7 @@ class model:
         self.name              = name    # name of the model
         self.regression_matrix = regression_matrix    # the regression matrix of size nxm, m=num of parameters and n=num of measurements 
         self.n_params          = self.regression_matrix.shape[1]
+        
         self.measurements      = None    # the measurements of size nx1
         self.verbose           = verbose
         self.trigger           = 0
@@ -615,7 +616,7 @@ class model:
         self.OLS_params = self.OLS_cov@A.T@self.measurements
 
         self.OLS_y    = (A@self.OLS_params).flatten()
-        self.OLS_RMSE = self.calc_RMSE(self.OLS_y, self.measurements)  # calculating the RMSE of the OLS estimate
+        self.OLS_RMSE, self.OLS_RMSE_rel, self.OLS_eps_max = self.calc_RMSE(self.OLS_y, self.measurements)  # calculating the RMSE of the OLS estimate
         self.OLS_R2   = self.calc_R2(self.OLS_y, self.measurements)      # calculating the R2 of the OLS estimate
         if self.verbose: print(f'Finished OLS\n')
 
@@ -658,30 +659,34 @@ class model:
             raise ValueError(f"\n    Solver {solver} not recognized. Please choose either 'ES' or 'scipy'\n")
         
         self.MLE_y      = (A@self.MLE_params).flatten()
-        self.MLE_RMSE   = self.calc_RMSE(self.MLE_y, self.measurements)    # calculating the RMSE of the MLE estimate
+        self.MLE_RMSE, self.MLE_RMSE_rel, self.MLE_eps_max   = self.calc_RMSE(self.MLE_y, self.measurements)    # calculating the RMSE of the MLE estimate
         self.MLE_R2     = self.calc_R2(self.MLE_y, self.measurements)      # calculating the R2 of the MLE estimate
         if self.verbose: print(f'Finished MLE\n')
 
 
-    def RLS_estimate(self):
+    def RLS_estimate(self, RLS_params=None):
         """
         Performs a recursive least squares estimation of the model parameters
         """
         if self.verbose: print(f'\nEstimating parameters with recursive least squares...')
-        RLS_params          = np.zeros((self.n_params,1))   # initializing the RLS parameters
+        RLS_params          = np.zeros((self.n_params,1)) if RLS_params is None else RLS_params   # initializing the RLS parameters
         P                   = np.eye(self.n_params)         # initializing the RLS covariance matrix
         A                   = self.regression_matrix        # shorter names for readability
         y                   = self.measurements             # shorter names for readability    
         N                   = y.size                        # number of measurements
 
         self.RLS_all_params = np.zeros((self.n_params,N))   # initializing the RLS parameters for all measurements
-
+        forget_factor_min   = 0.75
+        sigma_0             = 70
         for i in range(N):
             smol_a          = A[[i],:].copy()                      
             smol_y          = y[[i],:].copy()
             RLS_gain        = P@smol_a.T@np.linalg.inv(smol_a@P@smol_a.T+1)
-            RLS_params = RLS_params + RLS_gain@(smol_y - smol_a@RLS_params)
-            P               = (np.eye(self.n_params) - RLS_gain@smol_a)@P
+            forget_factor   = 1 - 1/sigma_0*(1 - smol_a@RLS_gain)*(smol_y - smol_a@RLS_params)**2
+            forget_factor   = max(forget_factor_min, forget_factor)
+            # forget_factor   = 1
+            RLS_params      = RLS_params + RLS_gain@(smol_y - smol_a@RLS_params)
+            P               = 1/forget_factor*(np.eye(self.n_params) - RLS_gain@smol_a)@P
             self.RLS_all_params[:,[i]] = RLS_params
 
             if self.verbose:
@@ -700,7 +705,7 @@ class model:
         self.RLS_y      = (A@RLS_params).flatten()
         self.RLS_cov    = P
         self.RLS_params = RLS_params
-        self.RLS_RMSE   = self.calc_RMSE(self.RLS_y, self.measurements)    # calculating the RMSE of the RLS estimate
+        self.RLS_RMSE, self.RLS_RMSE_rel, self.RLS_eps_max   = self.calc_RMSE(self.RLS_y, self.measurements)    # calculating the RMSE of the RLS estimate
         self.RLS_R2     = self.calc_R2(self.RLS_y, self.measurements)      # calculating the R2 of the RLS estimate
         if self.verbose: print(f'Finished RLS\n')
 
@@ -726,6 +731,7 @@ class model:
         N = y.size
 
         epsilon = y-p
+
         # self.ensemble_cov += epsilon@epsilon.T
         # cov_rank = np.linalg.matrix_rank(self.ensemble_cov)
         # if cov_rank < N:
@@ -740,6 +746,7 @@ class model:
         # likelihood = np.prod(epsilon**2)
         # likelihood = np.sqrt(epsilon.T@epsilon)
         # likelihood = np.sqrt(np.sum(epsilon**2))
+
         likelihood = epsilon.T@epsilon
         return likelihood
 
@@ -748,11 +755,45 @@ class model:
         """
         Calculates the R2 value between the model output and the measured output
         """
-        return 1 - np.sum((model_y - measured_y)**2)/np.sum((measured_y - np.mean(measured_y))**2)
+        # yhat = model_y
+        # ybar = np.sum(model_y)/(len(model_y))
+        # ssreg = np.sum((yhat-ybar)**2)
+        # sstot = np.sum((model_y - ybar)**2)
+        # print('\n\n',ssreg, sstot, '\n\n')
+        # return ssreg/sstot
+        measured_y = measured_y.flatten()
+        ss_res = np.sum((measured_y - model_y)**2)
+        ss_tot = np.sum((measured_y - np.mean(measured_y))**2)
+        return 1 - ss_res/ss_tot
     
 
     def calc_RMSE(self, model_y, measured_y):
         """
-        Calculates the root mean squared error between the model output and the measured output
+        Calculates some root mean square statistics of the model and measured outputs
+        Parameters
+        ----------
+        model_y : numpy array
+            The model output
+        measured_y : numpy array
+            The measured output
+        Returns
+        -------
+        RMSE : float
+            The root mean square error between the model and measured outputs
+        RMSE_rel : float
+            The relative root mean square error between the model and measured outputs scaled by range of measured output
+        eps_max : float
+            The maximum error between the model and measured outputs
         """
-        return np.sqrt(np.sum((model_y - measured_y)**2)/self.measurements.size)
+        measured_y_range = np.abs(np.max(measured_y) - np.min(measured_y))
+        epsilons = np.abs(model_y - measured_y)
+        RMSE = np.sqrt(np.sum(epsilons**2)/measured_y.size)
+        RMSE_rel = RMSE/measured_y_range
+        eps_max = np.max(epsilons)
+        return RMSE, RMSE_rel, eps_max
+
+        # RMS_rel = np.sqrt(np.sum((model_y - measured_y)**2)/np.sum(measured_y**2))
+        # return np.sqrt(np.sum((model_y - measured_y)**2)/self.measurements.size)
+
+
+    
