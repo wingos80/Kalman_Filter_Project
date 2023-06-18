@@ -25,6 +25,8 @@ for i in range(n):
     f_model = model(np.array([np.ones_like(x), x, x**2, x**3, x**4]).T,verbose=True)
     f_model.measurements = y_noise.reshape(y_noise.size,1)
     f_model.OLS_estimate()
+    print('asubfsdai')
+    f_model.OLS_estimate(validate=True)
     # f_model.MLE_estimate(solver="scipy")
     # print(f'scipy mle params: {f_model.MLE_params}')
     # plt.plot(x,f_model.MLE_y, label='MLE estimate scipy')

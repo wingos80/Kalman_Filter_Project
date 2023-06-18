@@ -196,7 +196,7 @@ for filename in files:
     new_lambdas        = Xs[12:]                              # Predicted lambda from KF
     lambda_covariances = kalman_filter.PP_k1_k1[12:]          # Predicted lambda covariance from KF
 
-    #  some plotting parameters that are useful to save
+    # just saving some colors
     colors=['C0','C1','C2','C0','C1','C2']
 
     # Use 3D scatter plot to visualize the airplane position over time

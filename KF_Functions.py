@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from Optimize import *
 from scipy.optimize import minimize
+from sklearn.metrics import r2_score 
 
 # g = 9.78335                # gravitational acceleration [m/s^2]
 g = 9.80665                # gravitational acceleration [m/s^2]
@@ -606,22 +607,27 @@ class model:
         self.trigger           = 0
 
 
-    def OLS_estimate(self):
+    def OLS_estimate(self, validate=False):
         """
         Performs an ordinary least squares estimation of the model parameters
         """
-        if self.verbose: print(f'\nEstimating parameters with ordinary least squares...')
         A = self.regression_matrix
-        self.OLS_cov = np.linalg.inv(A.T@A)
-        self.OLS_params = self.OLS_cov@A.T@self.measurements
+        if validate == False:
+            if self.verbose: print(f'\nEstimating parameters with ordinary least squares...')
+            self.OLS_cov = np.linalg.inv(A.T@A)
+            self.OLS_params = self.OLS_cov@A.T@self.measurements
+            if self.verbose: print(f'Finished OLS\n')
 
         self.OLS_y    = (A@self.OLS_params).flatten()
-        self.OLS_RMSE, self.OLS_RMSE_rel, self.OLS_eps_max = self.calc_RMSE(self.OLS_y, self.measurements)  # calculating the RMSE of the OLS estimate
-        self.OLS_R2   = self.calc_R2(self.OLS_y, self.measurements)      # calculating the R2 of the OLS estimate
-        if self.verbose: print(f'Finished OLS\n')
+        self.OLS_RMSE, self.OLS_RMSE_rel, self.OLS_eps_max = self.calc_RMSE(self.OLS_y, self.measurements.flatten())  # calculating the RMSE of the OLS estimate
+        self.OLS_R2   = self.calc_R2(self.OLS_y, self.measurements.flatten())      # calculating the R2 of the OLS estimate
+
+        if validate:
+            print(f'\nFinished OLS validation\n')
+            print(f' RMSE: {round(self.OLS_RMSE, 2)}\n RMSE_rel: {round(self.OLS_RMSE_rel*100, 2)} \%\n eps_max: {round(self.OLS_eps_max*100,2)} \%\n R2: {round(self.OLS_R2*100,2)} \%\n')
 
 
-    def MLE_estimate(self, solver="ES"):
+    def MLE_estimate(self, solver="ES", validate=False):
         """
         Performs a maximum likelihood estimation of the model parameters
         """
@@ -629,85 +635,95 @@ class model:
         g    = 20
         n    = 100                         # number of particles
         A    = self.regression_matrix
-        self.H = A@np.linalg.inv(A.T@A)@A.T
-
-        N = self.measurements.size
-        self.ensemble_cov = np.zeros((N, N))
-        if solver=="ES":
-            if self.verbose: print(f'\n    Running Evolutionary Strategies to optimize the Maximum Likelihood...')
-            test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_individuals=50, num_generations=100, num_offspring_per_individual=4, verbose=False)
-            self.MLE_params = test.run().reshape(self.n_params,1)
-            self.MLE_best   = test.group_best_fit
-            if self.verbose: print(f'    Finished Evolutionary Strategies Maximum Likelihood \n')
-
-        elif solver=="scipy":
-            if self.verbose: print(f'\n    Running Scipy to optimize the Maximum Likelihood...')
-            self.MLE_params = np.random.rand(self.n_params,1)
-            self.MLE_params = minimize(self.log_likelihood, self.MLE_params).x.reshape(self.n_params,1)    
-            self.MLE_best   = 1
-            if self.verbose: print(f'    Finished Scipy Maximum Likelihood \n')
-            
-        elif solver=="combo":
-            # Running ES first to optimize to a local area, then using anlaytical methods from Scipy to converge to local optimum
-            if self.verbose: print(f'\n    Running Evolutionary Strategies + Scipy to optimize the Maximum Likelihood...')
-            test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_generations=200, num_offspring_per_individual=6, verbose=False)
-            self.MLE_params = test.run().reshape(self.n_params,1)
-            self.MLE_params = minimize(self.log_likelihood, self.MLE_params).x.reshape(self.n_params,1)    
-            self.MLE_best   = test.group_best_fit
-            if self.verbose: print(f'    Finished Evolutionary Strategies + Scipy Maximum Likelihood \n')
-        else:
-            raise ValueError(f"\n    Solver {solver} not recognized. Please choose either 'ES' or 'scipy'\n")
         
+        if validate == False:
+            self.H = A@np.linalg.inv(A.T@A)@A.T
+
+            N = self.measurements.size
+            self.ensemble_cov = np.zeros((N, N))
+            if solver=="ES":
+                if self.verbose: print(f'\n    Running Evolutionary Strategies to optimize the Maximum Likelihood...')
+                test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_individuals=50, num_generations=100, num_offspring_per_individual=4, verbose=False)
+                self.MLE_params = test.run().reshape(self.n_params,1)
+                self.MLE_best   = test.group_best_fit
+                if self.verbose: print(f'    Finished Evolutionary Strategies Maximum Likelihood \n')
+
+            elif solver=="scipy":
+                if self.verbose: print(f'\n    Running Scipy to optimize the Maximum Likelihood...')
+                self.MLE_params = np.random.rand(self.n_params,1)
+                self.MLE_params = minimize(self.log_likelihood, self.MLE_params).x.reshape(self.n_params,1)    
+                self.MLE_best   = 1
+                if self.verbose: print(f'    Finished Scipy Maximum Likelihood \n')
+                
+            elif solver=="combo":
+                # Running ES first to optimize to a local area, then using anlaytical methods from Scipy to converge to local optimum
+                if self.verbose: print(f'\n    Running Evolutionary Strategies + Scipy to optimize the Maximum Likelihood...')
+                test = ES(fitness_function=self.log_likelihood, num_dimensions=self.n_params, num_generations=200, num_offspring_per_individual=6, verbose=False)
+                self.MLE_params = test.run().reshape(self.n_params,1)
+                self.MLE_params = minimize(self.log_likelihood, self.MLE_params).x.reshape(self.n_params,1)    
+                self.MLE_best   = test.group_best_fit
+                if self.verbose: print(f'    Finished Evolutionary Strategies + Scipy Maximum Likelihood \n')
+            else:
+                raise ValueError(f"\n    Solver {solver} not recognized. Please choose either 'ES' or 'scipy'\n")
+            if self.verbose: print(f'Finished MLE\n')
+            
         self.MLE_y      = (A@self.MLE_params).flatten()
-        self.MLE_RMSE, self.MLE_RMSE_rel, self.MLE_eps_max   = self.calc_RMSE(self.MLE_y, self.measurements)    # calculating the RMSE of the MLE estimate
-        self.MLE_R2     = self.calc_R2(self.MLE_y, self.measurements)      # calculating the R2 of the MLE estimate
-        if self.verbose: print(f'Finished MLE\n')
+        self.MLE_RMSE, self.MLE_RMSE_rel, self.MLE_eps_max   = self.calc_RMSE(self.MLE_y, self.measurements.flatten())    # calculating the RMSE of the MLE estimate
+        self.MLE_R2     = self.calc_R2(self.MLE_y, self.measurements.flatten())      # calculating the R2 of the MLE estimate
+        if validate:
+            print(f'\nFinished MLE validation\n')
+            print(f' RMSE: {round(self.MLE_RMSE, 2)}\n RMSE_rel: {round(self.MLE_RMSE_rel*100, 2)} \%\n eps_max: {round(self.MLE_eps_max*100,2)} \%\n R2: {round(self.MLE_R2*100,2)} \%\n')
 
 
-    def RLS_estimate(self, RLS_params=None):
+    def RLS_estimate(self, RLS_params=None, validate=False):
         """
         Performs a recursive least squares estimation of the model parameters
         """
         if self.verbose: print(f'\nEstimating parameters with recursive least squares...')
-        RLS_params          = np.zeros((self.n_params,1)) if RLS_params is None else RLS_params   # initializing the RLS parameters
         P                   = np.eye(self.n_params)         # initializing the RLS covariance matrix
         A                   = self.regression_matrix        # shorter names for readability
         y                   = self.measurements             # shorter names for readability    
         N                   = y.size                        # number of measurements
 
-        self.RLS_all_params = np.zeros((self.n_params,N))   # initializing the RLS parameters for all measurements
-        forget_factor_min   = 0.75
-        sigma_0             = 70
-        for i in range(N):
-            smol_a          = A[[i],:].copy()                      
-            smol_y          = y[[i],:].copy()
-            RLS_gain        = P@smol_a.T@np.linalg.inv(smol_a@P@smol_a.T+1)
-            forget_factor   = 1 - 1/sigma_0*(1 - smol_a@RLS_gain)*(smol_y - smol_a@RLS_params)**2
-            forget_factor   = max(forget_factor_min, forget_factor)
-            # forget_factor   = 1
-            RLS_params      = RLS_params + RLS_gain@(smol_y - smol_a@RLS_params)
-            P               = 1/forget_factor*(np.eye(self.n_params) - RLS_gain@smol_a)@P
-            self.RLS_all_params[:,[i]] = RLS_params
+        if validate == False:
+            RLS_params          = np.zeros((self.n_params,1)) if RLS_params is None else RLS_params   # initializing the RLS parameters
+            self.RLS_all_params = np.zeros((self.n_params,N))   # initializing the RLS parameters for all measurements
+            forget_factor_min   = 0.75
+            sigma_0             = 70
+            for i in range(N):
+                smol_a          = A[[i],:].copy()                      
+                smol_y          = y[[i],:].copy()
+                RLS_gain        = P@smol_a.T@np.linalg.inv(smol_a@P@smol_a.T+1)
+                forget_factor   = 1 - 1/sigma_0*(1 - smol_a@RLS_gain)*(smol_y - smol_a@RLS_params)**2
+                forget_factor   = max(forget_factor_min, forget_factor)
+                # forget_factor   = 1
+                RLS_params      = RLS_params + RLS_gain@(smol_y - smol_a@RLS_params)
+                P               = 1/forget_factor*(np.eye(self.n_params) - RLS_gain@smol_a)@P
+                self.RLS_all_params[:,[i]] = RLS_params
 
-            if self.verbose:
-                plt.figure(1)
-                plot_y = A@RLS_params
-                y_dots = y[:i+1,0]
-                x_dots = np.arange(i+1)
-                plt.scatter(x_dots, y_dots, label="Measurements", s=1, marker="x", alpha=0.6)
-                plt.plot(plot_y, label="RLS")
-                plt.grid()
-                plt.ylim(-150,150)
-                plt.pause(0.05)
-                plt.clf()
+                if self.verbose:
+                    plt.figure(1)
+                    plot_y = A@RLS_params
+                    y_dots = y[:i+1,0]
+                    x_dots = np.arange(i+1)
+                    plt.scatter(x_dots, y_dots, label="Measurements", s=1, marker="x", alpha=0.6)
+                    plt.plot(plot_y, label="RLS")
+                    plt.grid()
+                    plt.ylim(-150,150)
+                    plt.pause(0.05)
+                    plt.clf()
+            self.RLS_params = RLS_params
+            if self.verbose: print(f'Finished RLS\n')
         
         # calculating the final RLS parameters and model outputs
-        self.RLS_y      = (A@RLS_params).flatten()
+        self.RLS_y      = (A@self.RLS_params).flatten()
         self.RLS_cov    = P
-        self.RLS_params = RLS_params
-        self.RLS_RMSE, self.RLS_RMSE_rel, self.RLS_eps_max   = self.calc_RMSE(self.RLS_y, self.measurements)    # calculating the RMSE of the RLS estimate
-        self.RLS_R2     = self.calc_R2(self.RLS_y, self.measurements)      # calculating the R2 of the RLS estimate
-        if self.verbose: print(f'Finished RLS\n')
+        self.RLS_RMSE, self.RLS_RMSE_rel, self.RLS_eps_max   = self.calc_RMSE(self.RLS_y, self.measurements.flatten())    # calculating the RMSE of the RLS estimate
+        self.RLS_R2     = self.calc_R2(self.RLS_y, self.measurements.flatten())      # calculating the R2 of the RLS estimate
+
+        if validate:
+            print(f'\nFinished RLS validation\n')
+            print(f' RMSE: {round(self.RLS_RMSE, 2)}\n RMSE_rel: {round(self.RLS_RMSE_rel*100, 2)} \%\n eps_max: {round(self.RLS_eps_max*100,2)} \%\n R2: {round(self.RLS_R2*100,2)} \%\n')
 
 
     def log_likelihood(self, MLE_params):
@@ -761,7 +777,6 @@ class model:
         # sstot = np.sum((model_y - ybar)**2)
         # print('\n\n',ssreg, sstot, '\n\n')
         # return ssreg/sstot
-        measured_y = measured_y.flatten()
         ss_res = np.sum((measured_y - model_y)**2)
         ss_tot = np.sum((measured_y - np.mean(measured_y))**2)
         return 1 - ss_res/ss_tot
