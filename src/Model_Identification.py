@@ -210,17 +210,19 @@ for i, filename in enumerate(files):
 
     else:
         assert False, f'the filename {filename} is not a training file'
+        
 
     for i, model_k in enumerate(models):
         name = model_k.name
         print('\n----------------------------------------------------------------')
         print(f'Estimating {name}...')
-        model_k.verbose = False
+        model_k.verbose = True
         model_k.OLS_estimate()
         RLS_params = model_k.OLS_params.copy()
         RLS_params[0] = np.random.rand()
         print(f'constant changed from {model_k.OLS_params[0]} to {RLS_params[0]}')
-        model_k.RLS_estimate(RLS_params=RLS_params)
+        # model_k.RLS_estimate(RLS_params=RLS_params)
+        model_k.RLS_estimate()
         OLS_params = model_k.OLS_params
         RLS_params = model_k.RLS_params
         print(f'\n{model_k.name} OLS params:')
@@ -239,10 +241,10 @@ for i, filename in enumerate(files):
 
 
         print(f'\nOLS parameter variances:\n{my_round(model_k.OLS_P.diagonal(),3)}')
-        print(f'\nRLS parameter variances:\n{my_round(model_k.RLS_P.diagonal(),2)}')
-        ys = {f'{model_k.name} OLS values': [model_k.OLS_y,1.0],
-              f'{model_k.name} measurements': [model_k.measurements,0.5]}
-        make_plots(time, [ys], f'figs/models/train {model_k.name} OLS {filename.replace("_filtered.csv","")}', 'time [s]', ['Coefficient'], save=printfigs, colors=['C1','C0'])
+        # print(f'\nRLS parameter variances:\n{my_round(model_k.RLS_P.diagonal(),2)}')
+        # ys = {f'{model_k.name} OLS values': [model_k.OLS_y,1.0],
+        #       f'{model_k.name} measurements': [model_k.measurements,0.5]}
+        # make_plots(time, [ys], f'figs/models/train {model_k.name} OLS {filename.replace("_filtered.csv","")}', 'time [s]', ['Coefficient'], save=printfigs, colors=['C1','C0'])
 
         ys = {f'{model_k.name} RLS values': [model_k.RLS_y,1.0],
               f'{model_k.name} measurements': [model_k.measurements,0.5]}

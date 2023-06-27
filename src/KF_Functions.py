@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from src.Optimize import *
 from scipy.optimize import minimize
 from sklearn.metrics import r2_score 
-
+import math 
 # g = 9.78335                # gravitational acceleration [m/s^2]
 g = 9.80665                # gravitational acceleration [m/s^2]
 
@@ -611,13 +611,13 @@ class model:
         """
         Performs an ordinary least squares estimation of the model parameters
         """
-        A = self.regression_matrix
+        A = self.regression_matrix.copy()
         if validate == False:
             if self.verbose: print(f'\nEstimating parameters with ordinary least squares...')
             self.OLS_cov = np.linalg.inv(A.T@A)
             self.OLS_params = self.OLS_cov@A.T@self.measurements
             if self.verbose: print(f'Finished OLS\n')
-
+        print(f'ols params: {self.OLS_params}')
         self.OLS_y    = (A@self.OLS_params).flatten()
         
         if validate == False:
@@ -641,7 +641,7 @@ class model:
         if self.verbose: print(f'\nEstimating parameters with maximum likelihood...')
         g    = 20
         n    = 100                         # number of particles
-        A    = self.regression_matrix
+        A    = self.regression_matrix.copy()
         
         if validate == False:
             self.H = A@np.linalg.inv(A.T@A)@A.T
@@ -688,46 +688,127 @@ class model:
         """
         if self.verbose: print(f'\nEstimating parameters with recursive least squares...')
         P                   = np.eye(self.n_params)         # initializing the RLS covariance matrix
-        A                   = self.regression_matrix        # shorter names for readability
+        A                   = self.regression_matrix.copy() # shorter names for readability
         y                   = self.measurements             # shorter names for readability    
         N                   = y.size                        # number of measurements
+
+
+        class RLS:
+            def __init__(self, num_vars, lam, delta):
+                '''
+                num_vars: number of variables including constant
+                lam: forgetting factor, usually very close to 1.
+                '''
+                self.num_vars = num_vars
+                
+                # delta controls the initial state.
+                self.A = delta*np.matrix(np.identity(self.num_vars))
+                self.w = np.matrix(np.zeros(self.num_vars))
+                self.w = self.w.reshape(self.w.shape[1],1)
+                
+                # Variables needed for add_obs
+                self.lam_inv = lam**(-1)
+                self.sqrt_lam_inv = math.sqrt(self.lam_inv)
+                
+                # A priori error
+                self.a_priori_error = 0
+                
+                # Count of number of observations added
+                self.num_obs = 0
+
+            def add_obs(self, x, t):
+                '''
+                Add the observation x with label t.
+                x is a column vector as a numpy matrix
+                t is a real scalar
+                '''            
+                z = self.lam_inv*self.A*x
+                alpha = float((1 + x.T*z)**(-1))
+                self.a_priori_error = float(t - self.w.T*x)
+                self.w = self.w + (t-alpha*float(x.T*(self.w+t*z)))*z
+                self.A -= alpha*z*z.T
+                self.num_obs += 1
+                
+            def fit(self, X, y):
+                '''
+                Fit a model to X,y.
+                X and y are numpy arrays.
+                Individual observations in X should have a prepended 1 for constant coefficient.
+                '''
+                for i in range(len(X)):
+                    x = np.transpose(np.matrix(X[i]))
+                    self.add_obs(x,y[i])
+
+
+            def get_error(self):
+                '''
+                Finds the a priori (instantaneous) error. 
+                Does not calculate the cumulative effect
+                of round-off errors.
+                '''
+                return self.a_priori_error
+            
+            def predict(self, x):
+                '''
+                Predict the value of observation x. x should be a numpy matrix (col vector)
+                '''
+                return float(self.w.T*x)
+
 
         if validate == False:
             RLS_params          = np.zeros((self.n_params,1)) if RLS_params is None else RLS_params   # initializing the RLS parameters
             self.RLS_all_params = np.zeros((self.n_params,N))   # initializing the RLS parameters for all measurements
             forget_factor_min   = 0.75
             sigma_0             = 70
+            
+            lam = 0.98
+            LS = RLS(self.n_params,lam,1)
+            # Not using the RLS.fit function because I want to remember all the predicted values
+            pred_x = []
+            pred_y = []
             for i in range(N):
-                smol_a          = A[[i],:].copy()                      
-                smol_y          = y[[i],:].copy()
-                RLS_gain        = P@smol_a.T@np.linalg.inv(smol_a@P@smol_a.T+1)
-                forget_factor   = 1 - 1/sigma_0*(1 - smol_a@RLS_gain)*(smol_y - smol_a@RLS_params)**2
-                forget_factor   = max(forget_factor_min, forget_factor)
-                # forget_factor   = 1
-                RLS_params      = RLS_params + RLS_gain@(smol_y - smol_a@RLS_params)
-                P               = 1/forget_factor*(np.eye(self.n_params) - RLS_gain@smol_a)@P
-                self.RLS_all_params[:,[i]] = RLS_params
+                smol_a          = A[[i],:].copy() 
+                pred_x.append(i)
+                pred_y.append(float(smol_a*LS.w))
+                LS.add_obs(smol_a.T,y[i,0])
+            
+            # for i in range(N):
+                
 
-                if self.verbose:
-                    plt.figure(1)
-                    plot_y = A@RLS_params
-                    y_dots = y[:i+1,0]
-                    x_dots = np.arange(i+1)
-                    plt.scatter(x_dots, y_dots, label="Measurements", s=1, marker="x", alpha=0.6)
-                    plt.plot(plot_y, label="RLS")
-                    plt.grid()
-                    plt.ylim(-150,150)
-                    plt.pause(0.05)
-                    plt.clf()
-            self.RLS_params = RLS_params
-            self.RLS_P    = P
+
+            #     # smol_a          = A[[i],:].copy()                      
+            #     # smol_y          = y[[i],:].copy()
+            #     # RLS_gain        = P@smol_a.T@np.linalg.inv(smol_a@P@smol_a.T+1)
+            #     # forget_factor   = 1 - 1/sigma_0*(1 - smol_a@RLS_gain)*(smol_y - smol_a@RLS_params)**2
+            #     # forget_factor   = max(forget_factor_min, forget_factor)
+            #     # forget_factor   = 1
+            #     # RLS_params      = RLS_params + RLS_gain@(smol_y - smol_a@RLS_params)
+            #     # P               = 1/forget_factor*(np.eye(self.n_params) - RLS_gain@smol_a)@P
+            #     # self.RLS_all_params[:,[i]] = RLS_params
+
+            #     if self.verbose:
+            #         plt.figure(1)
+            #         plot_y = A@RLS_params
+            #         y_dots = y[:i+1,0]
+            #         x_dots = np.arange(i+1)
+            #         plt.scatter(x_dots, y_dots, label="Measurements", s=1, marker="x", alpha=0.6)
+            #         plt.plot(plot_y, label="RLS")
+            #         plt.grid()
+            #         # plt.ylim(-150,150)
+            #         plt.pause(0.01)
+            #         plt.clf()
+            # # self.RLS_params = RLS_params
+            self.RLS_params = np.array(LS.w)
+            print(self.RLS_params)
+            # self.RLS_P    = P
+            self.RLS_P     = LS.A
             if self.verbose: print(f'Finished RLS\n')
         
         # calculating the final RLS parameters and model outputs
         # self.RLS_params[-2] *= 2
         self.RLS_y      = (A@self.RLS_params).flatten()
-        self.RLS_RMSE, self.RLS_RMSE_rel, self.RLS_eps_max   = self.calc_RMSE(self.RLS_y, self.measurements.flatten())    # calculating the RMSE of the RLS estimate
-        self.RLS_R2     = self.calc_R2(self.RLS_y, self.measurements.flatten())      # calculating the R2 of the RLS estimate
+        # self.RLS_RMSE, self.RLS_RMSE_rel, self.RLS_eps_max   = self.calc_RMSE(self.RLS_y, self.measurements.flatten())    # calculating the RMSE of the RLS estimate
+        # self.RLS_R2     = self.calc_R2(self.RLS_y, self.measurements.flatten())      # calculating the R2 of the RLS estimate
 
         if validate:
             print(f'\nFinished RLS validation\n')
